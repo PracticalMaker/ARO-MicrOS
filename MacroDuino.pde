@@ -28,17 +28,18 @@ Andrew Oke - andrew@practicalmaker.com
 // NOTE THAT TURNING DEBUG ON WILL REQUIRE YOU TO TURN OFF ALL OTHER FUNCTIONS EXCEPT THE ONE YOUR DEBUGGING
 // OTHERWISE WITHIN A FEW COMMANDS YOU'LL RUN OUT OF MEMORY
 #define DEBUG 1
-#define SPION 0
+#define SPION 1
 #define SERIALON 1
-#define ETHERNETON 0
+#define ETHERNETON 1
+#define ETHERNETWIZNETCONTROL 1
 #define SERIALCONTROL 1
 #define KEYPADCONTROL 0
 #define DS1307ENABLED 0
 #define I2CLCDENABLED 0
-#define ONEWIREENABLED 1
-#define DS18B20ENABLED 1
-#define DIGITALENABLED 0
-#define ANALOGENABLED 0
+#define ONEWIREENABLED 0
+#define DS18B20ENABLED 0
+#define DIGITALENABLED 1
+#define ANALOGENABLED 1
 #define PHENABLED 0
 
 #define ARDUINO_VOLTAGE 5.06
@@ -56,7 +57,9 @@ unsigned int server_port_num = 80;
  * Variables you shouldn't change
  *********************/
 
-#define PH_GAIN 9.6525 
+#define PH_GAIN 9.6525
+//  url buffer size
+#define BUFSIZE 255
 
 unsigned int lengthSerialDataArray = 18;
 unsigned int serialDataArray[18];
@@ -132,7 +135,7 @@ unsigned int onewire_addresses_bytes = 8;
 
 #if ETHERNETON == 1
 byte mac[] = { 0xDE, 0xAD, 0xBE, 0xEF, 0xFE, 0xED };
-byte ip[] = { 192,168,1,20 };
+byte ip[] = { 192,168,1,28 };
 byte gateway[] = { 192,168,1,1};	
 byte subnet[] = { 255, 255, 255, 0 };
 #endif
@@ -161,7 +164,7 @@ void setup() {
 
 #if ETHERNETON == 1
   // start the Ethernet connection and the server:
-  Ethernet.begin(mac, ip);
+  Ethernet.begin(mac, ip, gateway, subnet);
   server.begin();  
 #endif
 
@@ -207,6 +210,10 @@ void loop(){
 	#if I2CLCDENABLED == 1
 	  printToLCD();
 	#endif
+
+        #if ETHERNETWIZNETCONTROL == 1
+          ethernetWiznetControl();
+        #endif
 
 }
 
@@ -366,6 +373,122 @@ void printToLCD() {
 * END PRINT TO LCD BLOCK
 *
 *********************************************/
+
+
+
+
+
+void ethernetWiznetControl() {
+	char clientline[BUFSIZE];
+	int index = 0;
+	String jsonOut = String();
+	
+	// listen for incoming clients
+	Client client = server.available();
+		
+	if (client) {	
+		//  reset input buffer
+		index = 0;
+
+		while (client.connected()) {
+			if (client.available()) {
+				char c = client.read();
+
+				//  fill url the buffer
+				if(c != '\n' && c != '\r') {
+					clientline[index] = c;
+					index++;
+
+					//  if we run out of buffer, overwrite the end
+					if(index >= BUFSIZE) {
+						index = BUFSIZE -1;
+					}
+				
+					continue;
+				} 
+			}
+
+			//  convert clientline into a proper
+			//  string for further processing
+			String urlString = String(clientline);
+			
+			//  extract the operation
+			String op = urlString.substring(0,urlString.indexOf(' '));
+			
+			//  we're only interested in the first part...
+			urlString = urlString.substring(urlString.indexOf('/'), urlString.indexOf(' ', urlString.indexOf('/')));
+			
+			//  put what's left of the URL back in client line
+			urlString.toCharArray(clientline, BUFSIZE);
+			
+			char *ethernetCommandString = strtok(clientline,"/");
+			
+			//  return value
+			client.println("HTTP/1.1 200 OK");
+			client.println("Content-Type: text/html");
+			client.println();
+			
+			if(strcmp(ethernetCommandString, "ARDUINOADDR") == 0) {
+				//  assemble the json output
+				jsonOut += "{\"";
+				jsonOut += "ARDUINOADDR";
+				jsonOut += "\":\"";
+				jsonOut += EEPROM.read(arduino_mem_addr) - '0';
+				jsonOut += "\"}";
+				
+				client.println(jsonOut);				
+			}else if(strcmp(ethernetCommandString, "RESETMACROS") == 0) {
+				//  assemble the json output
+				jsonOut += "{\"";
+				jsonOut += "RESETMACROS";
+				jsonOut += "\":\"";
+				jsonOut += "1";
+				jsonOut += "\"}";
+				
+				client.println(jsonOut);							
+			
+				resetMacros();
+			}else if(strcmp(ethernetCommandString, "PINMODE") == 0) {
+				int pin = atoi(strtok(NULL, "/"));
+				int mode = atoi(strtok(NULL, "/"));
+				setPinMode(pin, mode);
+				
+				//  assemble the json output
+				jsonOut += "{\"";
+				jsonOut += "PINMODE";
+				jsonOut += "\":\"";
+				jsonOut += pin;
+				jsonOut += "\":\"";				
+				jsonOut += mode;				
+				jsonOut += "\"}";
+				
+				client.println(jsonOut);
+			}else if(strcmp(ethernetCommandString, "SETPINSTATUS") == 0) {
+				int pin = atoi(strtok(NULL, "/"));
+				int pinstatus = atoi(strtok(NULL, "/"));
+				setPinStatus(pin, pinstatus);
+				
+				//  assemble the json output
+				jsonOut += "{\"";
+				jsonOut += "PINMODE";
+				jsonOut += "\":\"";
+				jsonOut += pin;
+				jsonOut += "\":\"";				
+				jsonOut += pinstatus;				
+				jsonOut += "\"}";
+				
+				client.println(jsonOut);
+			}
+			break;
+		}
+	
+		// give the web browser time to receive the data
+		delay(1);
+	
+		// close the connection:
+		client.stop();
+	}				
+}
 
 
 /**************************************************************
