@@ -4,6 +4,8 @@ V0.3
 
 Andrew Oke - andrew@practicalmaker.com
 
+V0.4 - 2011/06/07 - Added Support for Celsius
+
 */
 
 
@@ -41,6 +43,7 @@ Andrew Oke - andrew@practicalmaker.com
 #define DIGITALENABLED 1
 #define ANALOGENABLED 1
 #define PHENABLED 0
+#define CELSIUS 0
 
 #define ARDUINO_VOLTAGE 5.06
 #define PH_PIN 2
@@ -325,7 +328,12 @@ void printToLCD() {
 			}    
 			lcd.write((temp % 100));
 			lcd.write(degree_symbol);
-			lcd.write("F");
+                      #if CELSIUS == 1 
+			lcd.write("C");
+                      #elseif
+                        lcd.write("F");
+                      #endif  
+                        
 		}
 		if(EEPROM.read(display_ds18b20_temp2) == 1) {
 			lcd.setCursor(EEPROM.read(ds18b20_temp2_col), EEPROM.read(ds18b20_temp2_row));
@@ -338,7 +346,11 @@ void printToLCD() {
 			}    
 			lcd.write((temp % 100));
 			lcd.write(degree_symbol);
-			lcd.write("F");    
+		      #if CELSIUS == 1 
+			lcd.write("C");
+                      #elseif
+                        lcd.write("F");
+                      #endif  
 		}  
 		if(EEPROM.read(display_ds18b20_temp3) == 1) {
 			lcd.setCursor(EEPROM.read(ds18b20_temp3_col), EEPROM.read(ds18b20_temp3_row));
@@ -351,7 +363,11 @@ void printToLCD() {
 			}
 			lcd.write((temp % 100)); 
 			lcd.write(degree_symbol);
-			lcd.write("F");    
+	              #if CELSIUS == 1 
+			lcd.write("C");
+                      #elseif
+                        lcd.write("F");
+                      #endif   
 		}
 	#endif
 	
@@ -1415,8 +1431,10 @@ unsigned int getDS18B20Temp(int device_num) {
 		TReading = (TReading ^ 0xffff) + 1; // 2's comp
 	}
 	Tc_100 = (6 * TReading) + TReading / 4;    // multiply by (100 * 0.0625) or 6.25
-	
-	Tc_100 = c2f(Tc_100);
+
+	#if CELSIUS == 0
+         	Tc_100 = c2f(Tc_100);
+        #endif 
 	
 	return Tc_100;
 }
@@ -1521,10 +1539,11 @@ void runDS18B20Macro(unsigned int mem_address) {
  * miscellaneous converting functions
  * 
  **********************/
-
+#if CELSIUS == 0
 float c2f(float cel) {
   return (cel * (9.0/5.0)) + (float)3200;
 }
+#endif
 
 int highValue(int value) {
   return value / 256;
@@ -1537,7 +1556,6 @@ int lowValue(int value) {
 int combineValue(unsigned int lb, unsigned int hb) {
   return ((hb * 256) + lb);
 }
-
 
 
 
