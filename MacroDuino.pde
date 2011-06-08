@@ -1,10 +1,9 @@
 /*
-
-V0.3
-
 Andrew Oke - andrew@practicalmaker.com
 
+V0.3 - Initial Release
 V0.4 - 2011/06/07 - Added Support for Celsius
+V0.4.1 2011/06/08 - Rewrote interface and wrote ethernet interface. Much easier to add new interfaces as all all you do is grab the command line and pass it to the control function
 
 */
 
@@ -29,21 +28,22 @@ V0.4 - 2011/06/07 - Added Support for Celsius
  *******************/
 // NOTE THAT TURNING DEBUG ON WILL REQUIRE YOU TO TURN OFF ALL OTHER FUNCTIONS EXCEPT THE ONE YOUR DEBUGGING
 // OTHERWISE WITHIN A FEW COMMANDS YOU'LL RUN OUT OF MEMORY
-#define DEBUG 1
-#define SPION 1
-#define SERIALON 1
-#define ETHERNETON 1
-#define ETHERNETWIZNETCONTROL 1
-#define SERIALCONTROL 1
+#define DEBUG 0
+
+#define SPIINTERFACEON 1
+#define SERIALINTERFACEON 1
+#define ETHERNETWIZNETW5100INTERFACEON 0
+
 #define KEYPADCONTROL 0
-#define DS1307ENABLED 0
-#define I2CLCDENABLED 0
-#define ONEWIREENABLED 0
-#define DS18B20ENABLED 0
+#define DS1307ENABLED 1
+#define I2CLCDENABLED 1
+#define ONEWIREENABLED 1
+#define DS18B20ENABLED 1
 #define DIGITALENABLED 1
 #define ANALOGENABLED 1
 #define PHENABLED 0
 #define CELSIUS 0
+#define BUFSIZE 35
 
 #define ARDUINO_VOLTAGE 5.06
 #define PH_PIN 2
@@ -63,34 +63,6 @@ unsigned int server_port_num = 80;
 #define PH_GAIN 9.6525
 //  url buffer size
 #define BUFSIZE 255
-
-unsigned int lengthSerialDataArray = 18;
-unsigned int serialDataArray[18];
-
-unsigned int lengthCommandString = 24;
-char commandString[24];
-
-unsigned int macro_number;
-unsigned int macro_type;
-unsigned int watch_pin;
-unsigned int watch_state;
-unsigned int output_pin;
-unsigned int output_action;
-unsigned int output_time_on;
-unsigned int greater_less_equal;
-unsigned int hour_start;
-unsigned int minute_start;
-unsigned int hour_stop;
-unsigned int minute_stop;
-unsigned int sensor_num;
-
-unsigned int hour;
-unsigned int minute;
-unsigned int second;
-unsigned int day;
-unsigned int dayofweek;
-unsigned int month;
-unsigned int year;
 
 uint8_t degree_symbol = 0xDF;
 
@@ -136,7 +108,7 @@ unsigned int onewire_addresses_memend = 500;
 unsigned int onewire_addresses_bytes = 8;
 
 
-#if ETHERNETON == 1
+#if ETHERNETWIZNETW5100INTERFACEON == 1
 byte mac[] = { 0xDE, 0xAD, 0xBE, 0xEF, 0xFE, 0xED };
 byte ip[] = { 192,168,1,28 };
 byte gateway[] = { 192,168,1,1};	
@@ -156,7 +128,7 @@ I2CLCD lcd = I2CLCD(0x12, 20, 4);
 OneWire ds(onewire_pin);
 #endif
 
-#if ETHERNETON == 1
+#if ETHERNETWIZNETW5100INTERFACEON == 1
 Server server(server_port_num);
 #endif
 
@@ -165,13 +137,13 @@ void setup() {
   SPI.begin();
 #endif
 
-#if ETHERNETON == 1
+#if ETHERNETWIZNETW5100INTERFACEON == 1
   // start the Ethernet connection and the server:
   Ethernet.begin(mac, ip, gateway, subnet);
   server.begin();  
 #endif
 
-#if SERIALON == 1
+#if SERIALINTERFACEON == 1
   Serial.begin(9600);
 #endif
 
@@ -183,12 +155,6 @@ void setup() {
 #endif
 
   /*
-	set arduino address if one isn't present
-   	*/
-  if(EEPROM.read(arduino_mem_addr) == 0 || EEPROM.read(arduino_mem_addr) == 255){
-    EEPROM.write(arduino_mem_addr, random(100, 254));
-  }
-  /*
 	set pinmodes from eeprom
    	*/
   for(unsigned int i = digital_pin_mem_start; i <= digital_pin_mem_end; i++){
@@ -199,9 +165,8 @@ void setup() {
 
 void loop(){
 
-	#if SERIALCONTROL == 1
-		serialControl();
-		delay(100);
+	#if SERIALINTERFACEON == 1
+		serialInterface();
 	#endif
 	
 	#if DS1307ENABLED == 1
@@ -214,9 +179,9 @@ void loop(){
 	  printToLCD();
 	#endif
 
-        #if ETHERNETWIZNETCONTROL == 1
-          ethernetWiznetControl();
-        #endif
+	#if ETHERNETWIZNETW5100INTERFACEON == 1
+		ethernetWiznetW5100Interface();
+	#endif
 
 }
 
@@ -254,6 +219,13 @@ void runMacros() {
 void printToLCD() {
 	unsigned int temp;
 	unsigned int ph;
+unsigned int hour;
+unsigned int minute;
+unsigned int second;
+unsigned int day;
+unsigned int dayofweek;
+unsigned int month;
+unsigned int year;		
 	
 	#if DS1307ENABLED == 1
 	if(EEPROM.read(i2clcd_time_display) == 1) {
@@ -390,14 +362,35 @@ void printToLCD() {
 *
 *********************************************/
 
+void serialInterface() {
+	char serialCommandString[BUFSIZE];
+	
+	if(Serial.available() > 0){
+		// reset char str
+		for(unsigned int i = 0; i <= BUFSIZE; i++){
+			serialCommandString[i] = '\0';
+		}    
+		
+		unsigned int numSerialAvailable = Serial.available();
+		
+		for(unsigned int i = 0; i < numSerialAvailable; i++){
+			serialCommandString[i] = Serial.read();
+		}
+	
+		Serial.flush();
+	}
+	
+	delay(50);
+	
+	control(serialCommandString);
+  
+}
 
 
-
-
-void ethernetWiznetControl() {
+#if ETHERNETWIZNETW5100INTERFACEON == 1
+void ethernetWiznetW5100Interface() {
 	char clientline[BUFSIZE];
 	int index = 0;
-	String jsonOut = String();
 	
 	// listen for incoming clients
 	Client client = server.available();
@@ -437,64 +430,8 @@ void ethernetWiznetControl() {
 			//  put what's left of the URL back in client line
 			urlString.toCharArray(clientline, BUFSIZE);
 			
-			char *ethernetCommandString = strtok(clientline,"/");
-			
-			//  return value
-			client.println("HTTP/1.1 200 OK");
-			client.println("Content-Type: text/html");
-			client.println();
-			
-			if(strcmp(ethernetCommandString, "ARDUINOADDR") == 0) {
-				//  assemble the json output
-				jsonOut += "{\"";
-				jsonOut += "ARDUINOADDR";
-				jsonOut += "\":\"";
-				jsonOut += EEPROM.read(arduino_mem_addr) - '0';
-				jsonOut += "\"}";
-				
-				client.println(jsonOut);				
-			}else if(strcmp(ethernetCommandString, "RESETMACROS") == 0) {
-				//  assemble the json output
-				jsonOut += "{\"";
-				jsonOut += "RESETMACROS";
-				jsonOut += "\":\"";
-				jsonOut += "1";
-				jsonOut += "\"}";
-				
-				client.println(jsonOut);							
-			
-				resetMacros();
-			}else if(strcmp(ethernetCommandString, "PINMODE") == 0) {
-				int pin = atoi(strtok(NULL, "/"));
-				int mode = atoi(strtok(NULL, "/"));
-				setPinMode(pin, mode);
-				
-				//  assemble the json output
-				jsonOut += "{\"";
-				jsonOut += "PINMODE";
-				jsonOut += "\":\"";
-				jsonOut += pin;
-				jsonOut += "\":\"";				
-				jsonOut += mode;				
-				jsonOut += "\"}";
-				
-				client.println(jsonOut);
-			}else if(strcmp(ethernetCommandString, "SETPINSTATUS") == 0) {
-				int pin = atoi(strtok(NULL, "/"));
-				int pinstatus = atoi(strtok(NULL, "/"));
-				setPinStatus(pin, pinstatus);
-				
-				//  assemble the json output
-				jsonOut += "{\"";
-				jsonOut += "PINMODE";
-				jsonOut += "\":\"";
-				jsonOut += pin;
-				jsonOut += "\":\"";				
-				jsonOut += pinstatus;				
-				jsonOut += "\"}";
-				
-				client.println(jsonOut);
-			}
+			control(clientline);
+
 			break;
 		}
 	
@@ -505,595 +442,692 @@ void ethernetWiznetControl() {
 		client.stop();
 	}				
 }
+#endif
 
-
-/**************************************************************
- *
- *
- *
- * SERIALACONTROL INTERFACE
- *
- *
- *
- **************************************************************/
-
-
-
-#if SERIALCONTROL == 1
-void serialControl(){
-	if(Serial.available() > 0){
-		// reset char str
-		for(unsigned int i = 0; i <= lengthCommandString; i++){
-			commandString[i] = '\0';
-		}    
-		
-		unsigned int numSerialAvailable = Serial.available();
-		
-		for(unsigned int i = 0; i < numSerialAvailable; i++){
-			commandString[i] = Serial.read();
-		}
+#if ETHERNETWIZNETW5100INTERFACEON == 1
+void ethernetSendJSON(String key, String value) {
+	String jsonOut = String();
+	Client client = server.available();
 	
-		Serial.flush();		
+	if(client) {
+		//  return value
+		client.println("HTTP/1.1 200 OK");
+		client.println("Content-Type: text/html");
+		client.println();
+		
+		client.print("{ ");
+		client.print(key);
+		client.print(" : ");
+		client.print(value);
+		client.println(" }");
+		
 	}
+	delay(1);
+	client.stop();
+}
+#endif
 
-	if(strcmp(commandString, "ARDUINOADDR") == 0){
-		// each arduino is given a random number that will be used as it's address, this command prints it to the serial line
-		Serial.println(EEPROM.read(arduino_mem_addr), DEC);
-	}
+void serialSendJSON(String key, String value) {
+	Serial.print("{ ");
+	Serial.print(key);
+	Serial.print(" : ");
+	Serial.print(value);
+	Serial.println(" }");
+}
+
+void control(char commandString[BUFSIZE]) {
+	String key = String();
+	String value = String();
+	unsigned int macro_number;
+	unsigned int macro_type;
+	unsigned int watch_pin;
+	unsigned int watch_state;
+	unsigned int output_pin;
+	unsigned int output_action;
+	unsigned int output_time_on;
+	unsigned int greater_less_equal;
+	unsigned int hour_start;
+	unsigned int minute_start;
+	unsigned int hour_stop;
+	unsigned int minute_stop;
+	unsigned int sensor_num;	
+unsigned int hour;
+unsigned int minute;
+unsigned int second;
+unsigned int day;
+unsigned int dayofweek;
+unsigned int month;
+unsigned int year;	
 	
+	char *commandToken = strtok(commandString, "/");
 
-	if(strcmp(commandString, "RESETMACROS") == 0){
-		#if DEBUG == 1 && SERIALON == 1
-			Serial.println("Resetting Macros");
+	if(strcmp(commandToken, "ARDUINOACK") == 0) {
+		#if SERIALINTERFACEON == 1
+			serialSendJSON("ARDUINOACK", (int)EEPROM.read(arduino_mem_addr));
 		#endif
+		#if ETHERNETWIZNETW5100INTERFACEON == 1
+			ethernetSendJSON("ARDUINOACK", (int)EEPROM.read(arduino_mem_addr));
+		#endif
+	}	
+
+	if(strcmp(commandToken, "ARDUINOADDR") == 0) {
+		int address = atoi(strtok(NULL, "/"));
+		EEPROM.write(arduino_mem_addr, address);
+
+		#if SERIALINTERFACEON == 1
+			serialSendJSON("ARDUINOADDR", address);
+		#endif
+		#if ETHERNETWIZNETW5100INTERFACEON == 1
+			ethernetSendJSON("ARDUINOADDR", address);
+		#endif		
+	}
+	
+	if(strcmp(commandToken, "RESETMACROS") == 0) {
 		resetMacros();
-	}
-	
-
-	#if DIGITALENABLED == 1
-	if(strcmp(commandString, "PINMODE") == 0){
-		#if DEBUG == 1	&& SERIALON == 1
-			Serial.println("Command Received: PINMODE");
+		
+		#if SERIALINTERFACEON == 1
+			serialSendJSON("RESETMACROS", "1");
 		#endif
-		updateSerialDataArray();
-		setPinMode(((serialDataArray[0] * 10) + serialDataArray[1]), serialDataArray[2]);
+		#if ETHERNETWIZNETW5100INTERFACEON == 1
+			ethernetSendJSON("RESETMACROS", "1");
+		#endif		
+	}	
+	
+	#if DIGITALENABLED == 1
+	if(strcmp(commandToken, "PINMODE") == 0) {
+		int pin = atoi(strtok(NULL, "/"));
+		int mode = atoi(strtok(NULL, "/"));
+		setPinMode(pin, mode);
+	
+		#if SERIALINTERFACEON == 1
+			serialSendJSON(pin, mode);
+		#endif
+		#if ETHERNETWIZNETW5100INTERFACEON == 1
+			ethernetSendJSON(pin, mode);
+		#endif		
+	}
+	#endif
+	
+	#if DIGITALENABLED == 1
+	if(strcmp(commandToken, "SETPINSTATUS") == 0) {
+		int pin = atoi(strtok(NULL, "/"));
+		int pinstatus = atoi(strtok(NULL, "/"));
+		setPinStatus(pin, pinstatus);
+
+		#if SERIALINTERFACEON == 1
+			serialSendJSON(pin, pinstatus);
+		#endif
+		#if ETHERNETWIZNETW5100INTERFACEON == 1
+			ethernetSendJSON(pin, pinstatus);
+		#endif	
 	}
 	#endif
 
 	#if DIGITALENABLED == 1
-		if(strcmp(commandString, "SETPINSTATUS") == 0){
-			//manually set a pins status
-			//expects 5 bytes. 2 bytes pin number (01 - pin 1, 13 = pin 13) last 3 bytes are status. 001 = on, 000 = off, 120 = pwm 120 (make sure it's on a pwm pin)
-			#if DEBUG == 1 && SERIALON == 1
-				Serial.println("Command Received: SETPINSTATUS");
-			#endif
-			updateSerialDataArray();
-			setPinStatus(((serialDataArray[0] * 10) + serialDataArray[1]), ((serialDataArray[2] * 100) + (serialDataArray[3] * 10) + serialDataArray[4]));
-		}		
-	#endif	
+	if(strcmp(commandToken, "WDDOMACROSET") == 0) {
+		macro_number = atoi(strtok(NULL, "/"));
+		macro_type = atoi(strtok(NULL, "/"));
+		watch_pin = atoi(strtok(NULL, "/"));
+		watch_state = atoi(strtok(NULL, "/"));
+		output_pin = atoi(strtok(NULL, "/"));
+		output_action = atoi(strtok(NULL, "/"));
+		output_time_on = atoi(strtok(NULL, "/"));
+		watchDigitalPinDigitalPinOutputMacroSet(macro_number, macro_type, watch_pin, watch_state, output_pin, output_action, output_time_on);
 
-	#if DIGITALENABLED == 1
-		if(strcmp(commandString, "WDDOMACROSET") == 0){
-			#if DEBUG == 1 && SERIALON == 1
-				Serial.println("Command Received: WDDOMACROSET");
-			#endif		
-			updateSerialDataArray();
-			macro_number = (serialDataArray[0] * 10) + serialDataArray[1];
-			macro_type = serialDataArray[2];
-			watch_pin = (serialDataArray[3] * 10) + serialDataArray[4];
-			watch_state = serialDataArray[5];
-			output_pin = (serialDataArray[6] * 10) + serialDataArray[7];
-			output_action = (serialDataArray[8] * 100) + (serialDataArray[9] * 10) + serialDataArray[10];
-			output_time_on = (serialDataArray[11] * 1000) + (serialDataArray[12] * 100) + (serialDataArray[13] * 10) + serialDataArray[14];
-			watchDigitalPinDigitalPinOutputMacroSet(macro_number, macro_type, watch_pin, watch_state, output_pin, output_action, output_time_on);
-		}
+		#if SERIALINTERFACEON == 1
+			serialSendJSON("", "");
+		#endif
+		#if ETHERNETWIZNETW5100INTERFACEON == 1
+			ethernetSendJSON("", "");
+		#endif	
+	}
 	#endif
 	
 	#if ANALOGENABLED == 1
-		if(strcmp(commandString, "WADOMACROSET") == 0){
-			#if DEBUG == 1 && SERIALON == 1
-				Serial.println("Command Received: WADOMACROSET");
-			#endif		
-			updateSerialDataArray();
-			macro_number = (serialDataArray[0] * 10) + serialDataArray[1];
-			macro_type = serialDataArray[2];
-			watch_pin = (serialDataArray[3] * 10) + serialDataArray[4];
-			watch_state = (serialDataArray[5] * 1000) + (serialDataArray[6] * 100) + (serialDataArray[7] * 10) + serialDataArray[8];
-			greater_less_equal = serialDataArray[9];
-			output_pin = (serialDataArray[10] * 10) + serialDataArray[11];
-			output_action = (serialDataArray[12] * 100) + (serialDataArray[13] * 10) + serialDataArray[14];
-			output_time_on = (serialDataArray[15] * 1000) + (serialDataArray[16] * 100) + (serialDataArray[17] * 10) + serialDataArray[18];
-			watchAnalogPinDigitalPinOutputMacroSet(macro_number, macro_type, watch_pin, watch_state, output_pin, output_action, output_time_on, greater_less_equal);
-		}
+	if(strcmp(commandString, "WADOMACROSET") == 0){		
+		macro_number = atoi(strtok(NULL, "/"));
+		macro_type = atoi(strtok(NULL, "/"));
+		watch_pin = atoi(strtok(NULL, "/"));
+		watch_state = atoi(strtok(NULL, "/"));
+		greater_less_equal = atoi(strtok(NULL, "/"));
+		output_pin = atoi(strtok(NULL, "/"));
+		output_action = atoi(strtok(NULL, "/"));
+		output_time_on = atoi(strtok(NULL, "/"));
+		watchAnalogPinDigitalPinOutputMacroSet(macro_number, macro_type, watch_pin, watch_state, output_pin, output_action, output_time_on, greater_less_equal);
+		
+		#if SERIALINTERFACEON == 1
+			serialSendJSON("", "");
+		#endif
+		#if ETHERNETWIZNETW5100INTERFACEON == 1
+			ethernetSendJSON("", "");
+		#endif			
+	}
+	#endif		
+	
+	#if DIGITALENABLED == 1
+	if(strcmp(commandString, "DPINVAL") == 0){
+		watch_pin = atoi(strtok(NULL, "/"));
+		
+		#if SERIALINTERFACEON == 1
+			serialSendJSON(watch_pin, digitalRead(watch_pin));
+		#endif
+		#if ETHERNETWIZNETW5100INTERFACEON == 1
+			ethernetSendJSON(watch_pin, digitalRead(watch_pin));
+		#endif			
+	}
 	#endif	
 	
 	#if DIGITALENABLED == 1
-		if(strcmp(commandString, "DPINVAL") == 0){
-			#if DEBUG == 1 && SERIALON == 1
-				Serial.println("Command Received: DPINVAL");
-			#endif		
-			updateSerialDataArray();
-			Serial.println(digitalRead(((serialDataArray[0] * 10) + serialDataArray[1])));
-		}
-	#endif
-	  
-	#if ANALOGENABLED == 1
-		if(strcmp(commandString, "APINVAL") == 0){
-			#if DEBUG == 1 && SERIALON == 1
-				Serial.println("Command Received: APINVAL");
-			#endif		
-			updateSerialDataArray();
-			Serial.println(analogRead(serialDataArray[0]));
-		}
+	if(strcmp(commandString, "APINVAL") == 0){
+		watch_pin = atoi(strtok(NULL, "/"));
+		
+		#if SERIALINTERFACEON == 1
+			serialSendJSON(watch_pin, analogRead(watch_pin));
+		#endif
+		#if ETHERNETWIZNETW5100INTERFACEON == 1
+			ethernetSendJSON(watch_pin, analogRead(watch_pin));
+		#endif			
+	}
 	#endif	
 	
 	#if DS1307ENABLED == 1
-		if(strcmp(commandString, "DS1307SET") == 0){
-			#if DEBUG == 1 && SERIALON == 1
-				Serial.println("Command Received: DS1307SET");
-			#endif		
-			updateSerialDataArray();
-			hour = (serialDataArray[0] * 10) + serialDataArray[1];
-			minute = (serialDataArray[2] * 10) + serialDataArray[3];
-			second = (serialDataArray[4] * 10) + serialDataArray[5];
-			day = (serialDataArray[6] * 10) + serialDataArray[7];
-			dayofweek = serialDataArray[8];
-			month = (serialDataArray[9] * 10) + serialDataArray[10];
-			year = (serialDataArray[11] * 10) + serialDataArray[12];
-			
-			DS1307SetTime(hour, minute, second, day, dayofweek, month, year);
-		}	
+	if(strcmp(commandString, "DS1307SET") == 0){	
+		hour = atoi(strtok(NULL, "/"));
+		minute = atoi(strtok(NULL, "/"));
+		second = atoi(strtok(NULL, "/"));
+		day = atoi(strtok(NULL, "/"));
+		dayofweek = atoi(strtok(NULL, "/"));
+		month = atoi(strtok(NULL, "/"));
+		year = atoi(strtok(NULL, "/"));
+		
+		DS1307SetTime(hour, minute, second, day, dayofweek, month, year);
+		
+		#if SERIALINTERFACEON == 1
+			serialSendJSON("", "");
+		#endif
+		#if ETHERNETWIZNETW5100INTERFACEON == 1
+			ethernetSendJSON("", "");
+		#endif			
+	}	
 	#endif
 	
-	#if DS1307ENABLED == 1 && SERIALON == 1
-		if(strcmp(commandString, "DS1307TIME") == 0){
-			#if DEBUG == 1 && SERIALON == 1
-				Serial.println("Command Received: DS1307TIME");
-			#endif		
-			Serial.print(RTC.get(DS1307_HR,true));
-			Serial.print(":");
-			Serial.print(RTC.get(DS1307_MIN,false));
-			Serial.print(":");
-			Serial.print(RTC.get(DS1307_SEC,false));
-			Serial.print("      ");                 
-			Serial.print(RTC.get(DS1307_DATE,false));
-			Serial.print("/");
-			Serial.print(RTC.get(DS1307_MTH,false));
-			Serial.print("/");
-			Serial.println(RTC.get(DS1307_YR,false));
-		}
+	#if DS1307ENABLED == 1 && SERIALINTERFACEON == 1
+	if(strcmp(commandString, "DS1307TIME") == 0){
+		//TODO
+		Serial.print(RTC.get(DS1307_HR,true));
+		Serial.print(":");
+		Serial.print(RTC.get(DS1307_MIN,false));
+		Serial.print(":");
+		Serial.print(RTC.get(DS1307_SEC,false));
+		Serial.print("      ");                 
+		Serial.print(RTC.get(DS1307_DATE,false));
+		Serial.print("/");
+		Serial.print(RTC.get(DS1307_MTH,false));
+		Serial.print("/");
+		Serial.println(RTC.get(DS1307_YR,false));
+		
+		#if SERIALINTERFACEON == 1
+			serialSendJSON("", "");
+		#endif
+		#if ETHERNETWIZNETW5100INTERFACEON == 1
+			ethernetSendJSON("", "");
+		#endif			
+	}
 	#endif
 	
 	#if DS1307ENABLED == 1
-		if(strcmp(commandString, "WDS1307DOMACROSET") == 0){
-			#if DEBUG == 1 && SERIALON == 1
-				Serial.println("Command Received: WDS1307DOMACROSET");
-			#endif		
-			updateSerialDataArray();
-			macro_number = (serialDataArray[0] * 10) + serialDataArray[1];
-			macro_type = serialDataArray[2];
-			hour_start = (serialDataArray[3] * 10) + serialDataArray[4];
-			minute_start = (serialDataArray[5] * 10) + serialDataArray[6];
-			hour_stop = (serialDataArray[7] * 10) + serialDataArray[8];
-			minute_stop = (serialDataArray[9] * 10) + serialDataArray[10];
-			output_pin = (serialDataArray[11] * 10) + serialDataArray[12];
-			output_action = (serialDataArray[13] * 100) + (serialDataArray[14] * 10) + serialDataArray[15];
-			watchDS1307DigitalOutputMacroSet(macro_number, macro_type, hour_start, minute_start, hour_stop, minute_stop, output_pin, output_action);
-  
-		}
+	if(strcmp(commandString, "WDS1307DOMACROSET") == 0){	
+		macro_number = atoi(strtok(NULL, "/"));
+		macro_type = atoi(strtok(NULL, "/"));
+		hour_start = atoi(strtok(NULL, "/"));
+		minute_start = atoi(strtok(NULL, "/"));
+		hour_stop = atoi(strtok(NULL, "/"));
+		minute_stop = atoi(strtok(NULL, "/"));
+		output_pin = atoi(strtok(NULL, "/"));
+		output_action = atoi(strtok(NULL, "/"));
+		watchDS1307DigitalOutputMacroSet(macro_number, macro_type, hour_start, minute_start, hour_stop, minute_stop, output_pin, output_action);
+
+		#if SERIALINTERFACEON == 1
+			serialSendJSON("", "");
+		#endif
+		#if ETHERNETWIZNETW5100INTERFACEON == 1
+			ethernetSendJSON("", "");
+		#endif
+	}
 	#endif
 
 	#if I2CLCDENABLED == 1 && DS1307ENABLED == 1	
-		if(strcmp(commandString, "TIMEDISPLAYAS") == 0){
-			#if DEBUG == 1 && SERIALON == 1
-				Serial.println("Command Received: TIMEDISPLAYAS");
-			#endif			
-			updateSerialDataArray();
-			
-			EEPROM.write(display_time_as, serialDataArray[0]);
-			
-			#if I2CLCDENABLED == 1
-				lcd.clear();
-			#endif
-		}
+	if(strcmp(commandString, "TIMEDISPLAYAS") == 0){
+		EEPROM.write(display_time_as, atoi(strtok(NULL, "/")));
+		
+		#if I2CLCDENABLED == 1
+			lcd.clear();
+		#endif
+	}
 	#endif
 	
 	#if ONEWIREENABLED == 1
-		if(strcmp(commandString, "1WIREDEVICES") == 0){
-			#if DEBUG == 1 && SERIALON == 1
-				Serial.println("Command Received: 1WIREDEVICES");
-			#endif			
-			discoverOneWireDevices();
-		}else if(strcmp(commandString, "1WIREEEPROM") == 0){
-			#if DEBUG == 1 && SERIALON == 1
-				Serial.println("Command Received: 1WIREEEPROM");
-			#endif			
-			unsigned int mem_addresses = (onewire_addresses_memend - onewire_addresses_memstart) / (num_ds18b20_devices * onewire_addresses_bytes);
-			
-			for(unsigned int i = 0; i < mem_addresses; i++){
-				for(unsigned int j = 0; j < 8; j++){
-					Serial.print(EEPROM.read((onewire_addresses_memstart + (i * onewire_addresses_bytes) + j)), HEX); 
-					Serial.print(", ");
-				}
-				Serial.print("\r\n");
-			} 
-		}
+	if(strcmp(commandString, "1WIREDEVICES") == 0){		
+		discoverOneWireDevices();
+
+		#if SERIALINTERFACEON == 1
+			serialSendJSON("", "");
+		#endif
+		#if ETHERNETWIZNETW5100INTERFACEON == 1
+			ethernetSendJSON("", "");
+		#endif			
+	}
+	#endif
+	
+	#if ONEWIREENABLED == 1	
+	if(strcmp(commandString, "1WIREEEPROM") == 0){	
+		unsigned int mem_addresses = (onewire_addresses_memend - onewire_addresses_memstart) / (num_ds18b20_devices * onewire_addresses_bytes);
+		//TODO
+		for(unsigned int i = 0; i < mem_addresses; i++){
+			for(unsigned int j = 0; j < 8; j++){
+				Serial.print(EEPROM.read((onewire_addresses_memstart + (i * onewire_addresses_bytes) + j)), HEX); 
+				Serial.print(", ");
+			}
+			Serial.print("\r\n");
+		} 
+		
+		#if SERIALINTERFACEON == 1
+			serialSendJSON("", "");
+		#endif
+		#if ETHERNETWIZNETW5100INTERFACEON == 1
+			ethernetSendJSON("", "");
+		#endif			
+	}
 	#endif 
 	
 	#if DS18B20ENABLED == 1
-		if(strcmp(commandString, "DS18B20TEMP") == 0){
-			#if DEBUG == 1 && SERIALON == 1
-				Serial.println("Command Received: DS18B20TEMP");
-			#endif			
-			updateSerialDataArray();
-			
-			#if DEBUG == 1 && SERIALON == 1
-				Serial.print("Temp Sensor ");
-				Serial.println(serialDataArray[0]);
-			#endif
-			Serial.flush();
-
-			Serial.println(getDS18B20Temp(serialDataArray[0]));
-		}
+	if(strcmp(commandString, "DS18B20TEMP") == 0){
+		unsigned int temp_sensor_num = atoi(strtok(NULL, "/"));
+		#if SERIALINTERFACEON == 1
+			serialSendJSON(temp_sensor_num, getDS18B20Temp(temp_sensor_num));
+		#endif
+		#if ETHERNETWIZNETW5100INTERFACEON == 1
+			ethernetSendJSON(temp_sensor_num, getDS18B20Temp(temp_sensor_num));
+		#endif			
+	}
 	#endif 
 	
 	#if I2CLCDENABLED == 1 && DS1307ENABLED == 1
-		if(strcmp(commandString, "LCDTIMEDISP") == 0){
-			#if DEBUG == 1 && SERIALON == 1
-				Serial.println("Command Received: LCDTIMEDISP");
-			#endif			
-			updateSerialDataArray();
-			
-			#if DEBUG == 1 && SERIALON == 1
-				Serial.print("Display Time ");
-				Serial.println(serialDataArray[0]);
-			#endif
-
-			EEPROM.write(i2clcd_time_display, serialDataArray[0]);
-			
-			#if I2CLCDENABLED == 1
-				lcd.clear();
-			#endif
-		}
+	if(strcmp(commandString, "LCDTIMEDISP") == 0){
+		EEPROM.write(i2clcd_time_display, atoi(strtok(NULL, "/")));
+		
+		#if I2CLCDENABLED == 1
+			lcd.clear();
+		#endif
+		
+		#if SERIALINTERFACEON == 1
+			serialSendJSON("", "");
+		#endif
+		#if ETHERNETWIZNETW5100INTERFACEON == 1
+			ethernetSendJSON("", "");
+		#endif			
+	}
 	#endif
 	
 	#if I2CLCDENABLED == 1 && DS1307ENABLED == 1
-		if(strcmp(commandString, "LCDTIMEPOS") == 0){
-			#if DEBUG == 1 && SERIALON == 1
-				Serial.println("Command Received: LCDTIMEPOS");
-			#endif			
-			updateSerialDataArray();
-			
-			#if DEBUG == 1 && SERIALON == 1
-				Serial.print("Column ");
-				Serial.println(((serialDataArray[0] * 10) + serialDataArray[1]));
-			#endif
+	if(strcmp(commandString, "LCDTIMEPOS") == 0){
+		unsigned int row = atoi(strtok(NULL, "/"));
+		unsigned int col = atoi(strtok(NULL, "/"));
+		
+		#if DEBUG == 1 && SERIALINTERFACEON == 1
+			Serial.print("Column ");
+			Serial.println(col);
+		#endif
 
-			#if DEBUG == 1 && SERIALON == 1
-				Serial.print("Row ");
-				Serial.println(serialDataArray[2]);
-			#endif
+		#if DEBUG == 1 && SERIALINTERFACEON == 1
+			Serial.print("Row ");
+			Serial.println(row);
+		#endif
 
-			EEPROM.write(i2clcd_cursor_col, ((serialDataArray[0] * 10) + serialDataArray[1]));
-			EEPROM.write(i2clcd_cursor_row, serialDataArray[2]);
+		EEPROM.write(i2clcd_cursor_col, col);
+		EEPROM.write(i2clcd_cursor_row, row);
 
-			#if I2CLCDENABLED == 1
-				lcd.clear();
-			#endif
-		}
+		#if I2CLCDENABLED == 1
+			lcd.clear();
+		#endif
+		
+		#if SERIALINTERFACEON == 1
+			serialSendJSON("", "");
+		#endif
+		#if ETHERNETWIZNETW5100INTERFACEON == 1
+			ethernetSendJSON("", "");
+		#endif			
+	}
 	#endif
 	
 	#if DS18B20ENABLED == 1
-		if(strcmp(commandString, "TEMP1POS") == 0){
-			#if DEBUG == 1 && SERIALON == 1
-				Serial.println("Command Received: TEMP1POS");
-			#endif			
-			updateSerialDataArray();
+	if(strcmp(commandString, "TEMP1POS") == 0){
+		unsigned int row = atoi(strtok(NULL, "/"));
+		unsigned int col = atoi(strtok(NULL, "/"));		
+		
+		#if DEBUG == 1 && SERIALINTERFACEON == 1
+			Serial.print("Column ");
+			Serial.println(col);
+		#endif
+
+		#if DEBUG == 1 && SERIALINTERFACEON == 1
+		Serial.print("Row ");
+		Serial.println(row);
+		#endif
+		EEPROM.write(ds18b20_temp1_col, col);
+		EEPROM.write(ds18b20_temp1_row, row);
+
+		#if I2CLCDENABLED == 1
+			lcd.clear();
+		#endif
 			
-			#if DEBUG == 1 && SERIALON == 1
-				Serial.print("Column ");
-				Serial.println(((serialDataArray[0] * 10) + serialDataArray[1]));
-			#endif
-
-			#if DEBUG == 1 && SERIALON == 1
-			Serial.print("Row ");
-			Serial.println(serialDataArray[2]);
-			#endif
-			EEPROM.write(ds18b20_temp1_col, ((serialDataArray[0] * 10) + serialDataArray[1]));
-			EEPROM.write(ds18b20_temp1_row, serialDataArray[2]);
-
-			#if I2CLCDENABLED == 1
-				lcd.clear();
-			#endif
-		}
+		#if SERIALINTERFACEON == 1
+			serialSendJSON("", "");
+		#endif
+		#if ETHERNETWIZNETW5100INTERFACEON == 1
+			ethernetSendJSON("", "");
+		#endif				
+	}
 	#endif
 
 	#if DS18B20ENABLED == 1	
-		if(strcmp(commandString, "TEMP1SENSOR") == 0){
-			#if DEBUG == 1 && SERIALON == 1
-				Serial.println("Command Received: TEMP1SENSOR");
-			#endif			
-			updateSerialDataArray();
-			
-			#if DEBUG == 1 && SERIALON == 1
-				Serial.print("Temp 1 Sensor: ");
-				Serial.println(serialDataArray[0]);
-			#endif
-			EEPROM.write(ds18b20_temp1_sensor, serialDataArray[0]);
+	if(strcmp(commandString, "TEMP1SENSOR") == 0){
+		unsigned int sensor_num = atoi(strtok(NULL, "/"));
+		
+		#if DEBUG == 1 && SERIALINTERFACEON == 1
+			Serial.print("Temp 1 Sensor: ");
+			Serial.println(sensor_num);
+		#endif
+		EEPROM.write(ds18b20_temp1_sensor, sensor_num);
 
-			#if I2CLCDENABLED == 1
-				lcd.clear();
-			#endif
-		}
+		#if I2CLCDENABLED == 1
+			lcd.clear();
+		#endif
+		
+		#if SERIALINTERFACEON == 1
+			serialSendJSON("", "");
+		#endif
+		#if ETHERNETWIZNETW5100INTERFACEON == 1
+			ethernetSendJSON("", "");
+		#endif		
+	}
 	#endif
 		
 	#if DS18B20ENABLED == 1
-		if(strcmp(commandString, "TEMP1DISP") == 0){
-			#if DEBUG == 1 && SERIALON == 1
-				Serial.println("Command Received: TEMP1DISP");
-			#endif			
-			updateSerialDataArray();
-			
-			#if DEBUG == 1 && SERIALON == 1
-				Serial.print("Display TEMP1 ");
-				Serial.println(serialDataArray[0]);
-			#endif
-			EEPROM.write(display_ds18b20_temp1, serialDataArray[0]);
+	if(strcmp(commandString, "TEMP1DISP") == 0){
+		bool display_temp = atoi(strtok(NULL, "/"));
+		
+		#if DEBUG == 1 && SERIALINTERFACEON == 1
+			Serial.print("Display TEMP1 ");
+			Serial.println(display_temp);
+		#endif
+		EEPROM.write(display_ds18b20_temp1, display_temp);
 
-			#if I2CLCDENABLED == 1
-				lcd.clear();
-			#endif
-		}
+		#if I2CLCDENABLED == 1
+			lcd.clear();
+		#endif
+		
+		#if SERIALINTERFACEON == 1
+			serialSendJSON("", "");
+		#endif
+		#if ETHERNETWIZNETW5100INTERFACEON == 1
+			ethernetSendJSON("", "");
+		#endif			
+	}
 	#endif
 
 	#if DS18B20ENABLED == 1
-		if(strcmp(commandString, "TEMP2POS") == 0){
-			#if DEBUG == 1 && SERIALON == 1
-				Serial.println("Command Received: TEMP2POS");
-			#endif			
-			updateSerialDataArray();
-			
-			#if DEBUG == 1 && SERIALON == 1
-				Serial.print("Column ");
-				Serial.println(((serialDataArray[0] * 10) + serialDataArray[1]));
-			#endif
+	if(strcmp(commandString, "TEMP2POS") == 0){
+		unsigned int row = atoi(strtok(NULL, "/"));
+		unsigned int col = atoi(strtok(NULL, "/"));
+		
+		#if DEBUG == 1 && SERIALINTERFACEON == 1
+			Serial.print("Column ");
+			Serial.println(col);
+		#endif
 
-			#if DEBUG == 1 && SERIALON == 1
-			Serial.print("Row ");
-			Serial.println(serialDataArray[2]);
-			#endif
-			EEPROM.write(ds18b20_temp2_col, ((serialDataArray[0] * 10) + serialDataArray[1]));
-			EEPROM.write(ds18b20_temp2_row, serialDataArray[2]);
+		#if DEBUG == 1 && SERIALINTERFACEON == 1
+		Serial.print("Row ");
+		Serial.println(row);
+		#endif
+		EEPROM.write(ds18b20_temp2_col, col);
+		EEPROM.write(ds18b20_temp2_row, row);
 
-			#if I2CLCDENABLED == 1
-				lcd.clear();
-			#endif
-		}
+		#if I2CLCDENABLED == 1
+			lcd.clear();
+		#endif
+		
+		#if SERIALINTERFACEON == 1
+			serialSendJSON("", "");
+		#endif
+		#if ETHERNETWIZNETW5100INTERFACEON == 1
+			ethernetSendJSON("", "");
+		#endif		
+	}
 	#endif
 
 	#if DS18B20ENABLED == 1	
-		if(strcmp(commandString, "TEMP2SENSOR") == 0){
-			#if DEBUG == 1 && SERIALON == 1
-				Serial.println("Command Received: TEMP2SENSOR");
-			#endif			
-			updateSerialDataArray();
-			
-			#if DEBUG == 1 && SERIALON == 1
-				Serial.print("Temp 2 Sensor: ");
-				Serial.println(serialDataArray[0]);
-			#endif
-			EEPROM.write(ds18b20_temp2_sensor, serialDataArray[0]);
+	if(strcmp(commandString, "TEMP2SENSOR") == 0){
+		unsigned int sensor_num = atoi(strtok(NULL, "/"));
+		
+		#if DEBUG == 1 && SERIALINTERFACEON == 1
+			Serial.print("Temp 2 Sensor: ");
+			Serial.println(sensor_num);
+		#endif
+		EEPROM.write(ds18b20_temp2_sensor, sensor_num);
 
-			#if I2CLCDENABLED == 1
-				lcd.clear();
-			#endif
-		}
+		#if I2CLCDENABLED == 1
+			lcd.clear();
+		#endif
+		
+		#if SERIALINTERFACEON == 1
+			serialSendJSON("", "");
+		#endif
+		#if ETHERNETWIZNETW5100INTERFACEON == 1
+			ethernetSendJSON("", "");
+		#endif			
+	}
 	#endif
 		
 	#if DS18B20ENABLED == 1
-		if(strcmp(commandString, "TEMP2DISP") == 0){
-			#if DEBUG == 1 && SERIALON == 1
-				Serial.println("Command Received: TEMP2DISP");
-			#endif			
-			updateSerialDataArray();
-			
-			#if DEBUG == 1 && SERIALON == 1
-				Serial.print("Display TEMP2 ");
-				Serial.println(serialDataArray[0]);
-			#endif
-			EEPROM.write(display_ds18b20_temp2, serialDataArray[0]);
+	if(strcmp(commandString, "TEMP2DISP") == 0){
+		unsigned int display = atoi(strtok(NULL, "/"));
+		
+		#if DEBUG == 1 && SERIALINTERFACEON == 1
+			Serial.print("Display TEMP2 ");
+			Serial.println(display);
+		#endif
+		EEPROM.write(display_ds18b20_temp2, display);
 
-			#if I2CLCDENABLED == 1
-				lcd.clear();
-			#endif
-		}
+		#if I2CLCDENABLED == 1
+			lcd.clear();
+		#endif
+		
+		#if SERIALINTERFACEON == 1
+			serialSendJSON("", "");
+		#endif
+		#if ETHERNETWIZNETW5100INTERFACEON == 1
+			ethernetSendJSON("", "");
+		#endif					
+	}
 	#endif
 	
 	#if DS18B20ENABLED == 1
-		if(strcmp(commandString, "TEMP3POS") == 0){
-			#if DEBUG == 1 && SERIALON == 1
-				Serial.println("Command Received: TEMP3POS");
-			#endif			
-			updateSerialDataArray();
-			
-			#if DEBUG == 1 && SERIALON == 1
-				Serial.print("Column ");
-				Serial.println(((serialDataArray[0] * 10) + serialDataArray[1]));
-			#endif
+	if(strcmp(commandString, "TEMP3POS") == 0){
+		unsigned int col = atoi(strtok(NULL, "/"));
+		unsigned int row = atoi(strtok(NULL, "/"));
+		
+		#if DEBUG == 1 && SERIALINTERFACEON == 1
+			Serial.print("Column ");
+			Serial.println(col);
+		#endif
 
-			#if DEBUG == 1 && SERIALON == 1
-			Serial.print("Row ");
-			Serial.println(serialDataArray[2]);
-			#endif
-			EEPROM.write(ds18b20_temp3_col, ((serialDataArray[0] * 10) + serialDataArray[1]));
-			EEPROM.write(ds18b20_temp3_row, serialDataArray[2]);
+		#if DEBUG == 1 && SERIALINTERFACEON == 1
+		Serial.print("Row ");
+		Serial.println(row);
+		#endif
+		EEPROM.write(ds18b20_temp3_col, col);
+		EEPROM.write(ds18b20_temp3_row, row);
 
-			#if I2CLCDENABLED == 1
-				lcd.clear();
-			#endif
-		}
+		#if I2CLCDENABLED == 1
+			lcd.clear();
+		#endif
+		
+		#if SERIALINTERFACEON == 1
+			serialSendJSON("", "");
+		#endif
+		#if ETHERNETWIZNETW5100INTERFACEON == 1
+			ethernetSendJSON("", "");
+		#endif			
+	}
 	#endif
 
 	#if DS18B20ENABLED == 1	
-		if(strcmp(commandString, "TEMP3SENSOR") == 0){
-			#if DEBUG == 1 && SERIALON == 1
-				Serial.println("Command Received: TEMP3SENSOR");
-			#endif			
-			updateSerialDataArray();
-			
-			#if DEBUG == 1 && SERIALON == 1
-				Serial.print("Temp 3 Sensor: ");
-				Serial.println(serialDataArray[0]);
-			#endif
-			EEPROM.write(ds18b20_temp3_sensor, serialDataArray[0]);
+	if(strcmp(commandString, "TEMP3SENSOR") == 0){
+		unsigned int sensor_num = atoi(strtok(NULL, "/"));
+		
+		#if DEBUG == 1 && SERIALINTERFACEON == 1
+			Serial.print("Temp 3 Sensor: ");
+			Serial.println(sensor_num);
+		#endif
+		EEPROM.write(ds18b20_temp3_sensor, sensor_num);
 
-			#if I2CLCDENABLED == 1
-				lcd.clear();
-			#endif
-		}
+		#if I2CLCDENABLED == 1
+			lcd.clear();
+		#endif
+		
+		#if SERIALINTERFACEON == 1
+			serialSendJSON("", "");
+		#endif
+		#if ETHERNETWIZNETW5100INTERFACEON == 1
+			ethernetSendJSON("", "");
+		#endif			
+	}
 	#endif
 		
 	#if DS18B20ENABLED == 1
-		if(strcmp(commandString, "TEMP3DISP") == 0){
-			#if DEBUG == 1 && SERIALON == 1
-				Serial.println("Command Received: TEMP3DISP");
-			#endif			
-			updateSerialDataArray();
-			
-			#if DEBUG == 1 && SERIALON == 1
-				Serial.print("Display TEMP3 ");
-				Serial.println(serialDataArray[0]);
-			#endif
-			EEPROM.write(display_ds18b20_temp3, serialDataArray[0]);
+	if(strcmp(commandString, "TEMP3DISP") == 0){
+		unsigned int display = atoi(strtok(NULL, "/"));
+		
+		#if DEBUG == 1 && SERIALINTERFACEON == 1
+			Serial.print("Display TEMP3 ");
+			Serial.println(display);
+		#endif
+		EEPROM.write(display_ds18b20_temp3, display);
 
-			#if I2CLCDENABLED == 1
-				lcd.clear();
-			#endif
-		}
+		#if I2CLCDENABLED == 1
+			lcd.clear();
+		#endif
+		
+		#if SERIALINTERFACEON == 1
+			serialSendJSON("", "");
+		#endif
+		#if ETHERNETWIZNETW5100INTERFACEON == 1
+			ethernetSendJSON("", "");
+		#endif			
+	}
 	#endif
 	
 	#if DS18B20ENABLED == 1
-		if(strcmp(commandString, "DS18B20MACROSET") == 0){
-			#if DEBUG == 1 && SERIALON == 1
-				Serial.println("Command Received: DS18B20MACROSET");
-			#endif			
-			updateSerialDataArray();
+	if(strcmp(commandString, "DS18B20MACROSET") == 0){
 
-			macro_number = (serialDataArray[0] * 10) + serialDataArray[1];
-			macro_type = serialDataArray[2];
-			sensor_num = serialDataArray[3];
-			greater_less_equal = serialDataArray[4];
-			watch_state = (serialDataArray[5] * 1000) + (serialDataArray[6] * 100) + (serialDataArray[7] * 10) + serialDataArray[8];
-			output_pin = (serialDataArray[9] * 10) + serialDataArray[10];
-			output_action = (serialDataArray[11] * 100) + (serialDataArray[12] * 10) + serialDataArray[13];
+		macro_number = atoi(strtok(NULL, "/"));
+		macro_type = atoi(strtok(NULL, "/"));
+		sensor_num = atoi(strtok(NULL, "/"));
+		greater_less_equal = atoi(strtok(NULL, "/"));
+		watch_state = atoi(strtok(NULL, "/"));
+		output_pin = atoi(strtok(NULL, "/"));
+		output_action = atoi(strtok(NULL, "/"));
 
-			watchDS18B20DigitalOutputMacroSet(macro_number, macro_type, sensor_num, greater_less_equal, watch_state, output_pin, output_action);          
+		watchDS18B20DigitalOutputMacroSet(macro_number, macro_type, sensor_num, greater_less_equal, watch_state, output_pin, output_action);     
 		
-		}
+		#if SERIALINTERFACEON == 1
+			serialSendJSON("", "");
+		#endif
+		#if ETHERNETWIZNETW5100INTERFACEON == 1
+			ethernetSendJSON("", "");
+		#endif			
+	
+	}
 	#endif
 	
 	#if PHENABLED == 1
-		if(strcmp(commandString, "PRINTPH") == 0){
-			#if DEBUG == 1 && SERIALON == 1
-				Serial.println("Command Received: PRINTPH");
-			#endif			
-			updateSerialDataArray();
-			
-			#if DEBUG == 1 && SERIALON == 1
-				Serial.print("Print PH For Pin: ");
-				Serial.println(serialDataArray[0]);
-			#endif
-			Serial.println(getPHValue(serialDataArray[0]));
-		}
+	if(strcmp(commandString, "PRINTPH") == 0){
+		watch_pin = atoi(strtok(NULL, "/"));
+		
+                char phValue[5];
+		#if SERIALINTERFACEON == 1
+                        sprintf(phValue, "%f", getPHValue(watch_pin));
+			serialSendJSON(watch_pin, phValue);
+		#endif
+		#if ETHERNETWIZNETW5100INTERFACEON == 1
+                        sprintf(phValue, "%f", getPHValue(watch_pin));
+			ethernetSendJSON(watch_pin, phValue);
+		#endif		
+	}
 	#endif
 
 	#if PHENABLED == 1 && I2CLCDENABLED == 1	
-		if(strcmp(commandString, "PHPOS") == 0){
-			#if DEBUG == 1 && SERIALON == 1
-				Serial.println("Command Received: PHPOS");
-			#endif			
-			updateSerialDataArray();
-			
-			#if DEBUG == 1 && SERIALON == 1
-				Serial.print("Column ");
-				Serial.println(((serialDataArray[0] * 10) + serialDataArray[1]));
-			#endif
+	if(strcmp(commandString, "PHPOS") == 0){
+		unsigned int row = atoi(strtok(NULL, "/"));
+		unsigned int col = atoi(strtok(NULL, "/"));
+		
+		#if DEBUG == 1 && SERIALINTERFACEON == 1
+			Serial.print("Column ");
+			Serial.println(col);
+		#endif
 
 
-			#if DEBUG == 1 && SERIALON == 1
-				Serial.print("Row ");
-				Serial.println(serialDataArray[2]);
-			#endif
-			EEPROM.write(display_ph_col, ((serialDataArray[0] * 10) + serialDataArray[1]));
-			EEPROM.write(display_ph_row, serialDataArray[2]);
-			#if I2CLCDENABLED == 1
-				lcd.clear();
-			#endif              
-		}
+		#if DEBUG == 1 && SERIALINTERFACEON == 1
+			Serial.print("Row ");
+			Serial.println(row);
+		#endif
+		EEPROM.write(display_ph_col, col);
+		EEPROM.write(display_ph_row, row);
+		
+		#if I2CLCDENABLED == 1
+			lcd.clear();
+		#endif     
+		
+		#if SERIALINTERFACEON == 1
+			serialSendJSON("", "");
+		#endif
+		#if ETHERNETWIZNETW5100INTERFACEON == 1
+			ethernetSendJSON("", "");
+		#endif			
+	}
 	#endif
 	
 	#if PHENABLED == 1 && I2CLCDENABLED == 1
-		if(strcmp(commandString, "PHDISP") == 0){
-			#if DEBUG == 1 && SERIALON == 1
-				Serial.println("Command Received: PHDISP");
-			#endif				
-			updateSerialDataArray();
-			
-			#if DEBUG == 1 && SERIALON == 1
-				Serial.print("Display PH ");
-				Serial.println(serialDataArray[0]);
-			#endif
-			EEPROM.write(display_ph, serialDataArray[0]);
-			#if I2CLCDENABLED == 1
-				lcd.clear();
-			#endif              
-		}
-	#endif	
+	if(strcmp(commandString, "PHDISP") == 0){
+		unsigned int display = atoi(strtok(NULL, "/"));
+		
+		#if DEBUG == 1 && SERIALINTERFACEON == 1
+			Serial.print("Display PH ");
+			Serial.println(display);
+		#endif
+		EEPROM.write(display_ph, display);
+		#if I2CLCDENABLED == 1
+			lcd.clear();
+		#endif 
+		
+		#if SERIALINTERFACEON == 1
+			serialSendJSON("", "");
+		#endif
+		#if ETHERNETWIZNETW5100INTERFACEON == 1
+			ethernetSendJSON("", "");
+		#endif			
+	}
+	#endif		
 	
-	// reset char str
-	for(unsigned int i = 0; i <= lengthCommandString; i++){
+	
+	for(unsigned int i = 0; i <= BUFSIZE; i++) {
 		commandString[i] = '\0';
 	}
 }
-        
-void updateSerialDataArray() {
-	bool b;
-	unsigned int inByte;
-	
-	for(unsigned int i = 0; i < lengthSerialDataArray; i++) {
-		b = false;
-		while(b == false) {
-			if(Serial.available() > 0){
-				inByte = Serial.read();
-				inByte = inByte - '0';
-				
-				if(inByte == 40) {
-					b = true;
-					i = lengthSerialDataArray + 1;
-					break;
-				}
-				serialDataArray[i] = inByte;
-				#if DEBUG == 1	&& SERIALON == 1
-					Serial.print("Character Received: ");
-					Serial.println(serialDataArray[i]);
-				#endif
-				
-				b = true;
-			}
-		}
-	}
-	Serial.flush();
-}
-#endif
-/**************************************************************************************************
-*
-*
-*
-* END SERIALCONTROL BLOCK
-*
-*
-*
-***************************************************************************************************/
+
+
+
         
  
 /***************************************************************
@@ -1114,7 +1148,7 @@ void updateSerialDataArray() {
 *****************************************************************/
 #if DIGITALENABLED == 1         
 void setPinMode(unsigned int pin, unsigned int mode){
-	#if DEBUG == 1	&& SERIALON == 1
+	#if DEBUG == 1	&& SERIALINTERFACEON == 1
 		Serial.print("Set Pin Mode Pin: ");
 		Serial.println(pin);
 		Serial.print("Mode: ");
@@ -1127,7 +1161,7 @@ void setPinMode(unsigned int pin, unsigned int mode){
 
 #if DIGITALENABLED == 1
 void setPinStatus(unsigned int pin, unsigned int status) {
-	#if DEBUG == 1	&& SERIALON == 1
+	#if DEBUG == 1	&& SERIALINTERFACEON == 1
 		Serial.print("Set Pin Status Pin: ");
 		Serial.println(pin);
 		Serial.print("Status: ");
@@ -1144,7 +1178,7 @@ void setPinStatus(unsigned int pin, unsigned int status) {
     
 #if DIGITALENABLED == 1    
 void watchDigitalPinDigitalPinOutputMacroSet(unsigned int macro_number, unsigned int macro_type, unsigned int watch_pin, unsigned int watch_state, unsigned int output_pin, unsigned int output_action, unsigned int output_time_on){
-	#if DEBUG == 1 && SERIALON == 1
+	#if DEBUG == 1 && SERIALINTERFACEON == 1
 		Serial.print("Macro Number: ");
 		Serial.println(macro_number);
 		Serial.print("Macro Type: ");
@@ -1180,7 +1214,7 @@ void resetMacros(){
 		EEPROM.write(i, 0);
 		delay(5);
 	}
-	#if DEBUG == 1 && SERIALON == 1
+	#if DEBUG == 1 && SERIALINTERFACEON == 1
 		Serial.println("Reset Macros");
 	#endif
 }
@@ -1200,7 +1234,7 @@ void runDigitalMacro(unsigned int mem_address){
 
 #if ANALOGENABLED == 1    
 void watchAnalogPinDigitalPinOutputMacroSet(unsigned int macro_number, unsigned int macro_type, unsigned int watch_pin, unsigned int watch_state, unsigned int output_pin, unsigned int output_action, unsigned int output_time_on, unsigned int greater_less_equal){
-	#if DEBUG == 1 && SERIALON == 1
+	#if DEBUG == 1 && SERIALINTERFACEON == 1
 		Serial.print("Macro Number: ");
 		Serial.println(macro_number);
 		Serial.print("Macro Type: ");
@@ -1269,7 +1303,7 @@ void runAnalogMacro(unsigned int mem_address){
 
 #if DS1307ENABLED == 1
 void DS1307SetTime(unsigned int hour, unsigned int minute, unsigned int second, unsigned int day, unsigned int dow, unsigned int month, unsigned int year){
-	#if DEBUG == 1 && SERIALON == 1
+	#if DEBUG == 1 && SERIALINTERFACEON == 1
 		Serial.print("Hour: ");
 		Serial.println(hour);
 		Serial.print("Minute: ");
@@ -1299,6 +1333,15 @@ void DS1307SetTime(unsigned int hour, unsigned int minute, unsigned int second, 
 
 #if DS1307ENABLED == 1
 void updateDS1307() {
+//TODO
+unsigned int hour;
+unsigned int minute;
+unsigned int second;
+unsigned int day;
+unsigned int dayofweek;
+unsigned int month;
+unsigned int year;  
+  
 	hour = RTC.get(DS1307_HR,true);
 	minute = RTC.get(DS1307_MIN,false);
 	second = RTC.get(DS1307_SEC,false);
@@ -1327,11 +1370,9 @@ void watchDS1307DigitalOutputMacroSet(unsigned int macro_number, unsigned int ma
 void runDS1307Macro(unsigned int mem_address){
 	unsigned int time_start;
 	unsigned int time_stop;
-	unsigned int rtc_time;
+	unsigned int rtc_time;		
 	
-	updateDS1307();
-	
-	rtc_time = (hour * 100) + minute;
+	rtc_time = (RTC.get(DS1307_HR,true) * 100) + RTC.get(DS1307_MIN,true);
 	time_start = (EEPROM.read(mem_address + 1) * 100) + EEPROM.read(mem_address + 2);
 	time_stop = (EEPROM.read(mem_address + 3) * 100) + EEPROM.read(mem_address + 4);
 	
@@ -1339,18 +1380,18 @@ void runDS1307Macro(unsigned int mem_address){
 		if(EEPROM.read(mem_address + 6) <= 1) {
 			digitalWrite(EEPROM.read(mem_address + 5), EEPROM.read(mem_address + 6));
 		}else{
-			if(EEPROM.read(mem_address + 6) == 2 && hour == EEPROM.read(mem_address + 1)) {
-				#if DEBUG == 1 && SERIALON == 1
+			if(EEPROM.read(mem_address + 6) == 2 && RTC.get(DS1307_HR,false) == EEPROM.read(mem_address + 1)) {
+				#if DEBUG == 1 && SERIALINTERFACEON == 1
 					Serial.print("Fade In: ");
 					Serial.println((minute * 4));
 				#endif
-				analogWrite(EEPROM.read(mem_address + 5), (minute * 4));
-			}else if(EEPROM.read(mem_address + 6) == 2 && (hour + 1) == EEPROM.read(mem_address + 3)) {
-				#if DEBUG == 1 && SERIALON == 1
+				analogWrite(EEPROM.read(mem_address + 5), (RTC.get(DS1307_MIN,false) * 4));
+			}else if(EEPROM.read(mem_address + 6) == 2 && (RTC.get(DS1307_HR,false) + 1) == EEPROM.read(mem_address + 3)) {
+				#if DEBUG == 1 && SERIALINTERFACEON == 1
 					Serial.print("Fade Out: ");
 					Serial.println((255 - (minute * 4)));
 				#endif
-				analogWrite(EEPROM.read(mem_address + 5), (255 - (minute * 4)));
+				analogWrite(EEPROM.read(mem_address + 5), (255 - (RTC.get(DS1307_MIN,false) * 4)));
 			} else {
 				analogWrite(EEPROM.read(mem_address + 5), EEPROM.read(mem_address + 6));
 			}
@@ -1396,13 +1437,13 @@ unsigned int getDS18B20Temp(int device_num) {
 		addr[i] = EEPROM.read((onewire_addresses_memstart + (onewire_addresses_bytes * device_num) + i)); 
 	}
 	
-	#if DEBUG == 1 && SERIALON == 1 && SERIALON == 1
+	#if DEBUG == 1 && SERIALINTERFACEON == 1 && SERIALINTERFACEON == 1
 		if ( OneWire::crc8( addr, 7) != addr[7]) {
 			Serial.print("CRC is not valid!\n");
 		}
 	#endif
 	
-	#if DEBUG == 1 && SERIALON == 1
+	#if DEBUG == 1 && SERIALINTERFACEON == 1
 		if ( addr[0] != 0x28) {
 			Serial.print("Device is not a DS18S20 family device.\n");
 		}
@@ -1449,11 +1490,11 @@ void discoverOneWireDevices() {
 	unsigned int d = 0;
 	unsigned int e;
 	
-	#if DEBUG == 1 && SERIALON == 1
+	#if DEBUG == 1 && SERIALINTERFACEON == 1
 		Serial.print("Looking for 1-Wire devices...\n\r");
 	#endif
 	while(ds.search(addr)) {
-		#if DEBUG == 1 && SERIALON == 1
+		#if DEBUG == 1 && SERIALINTERFACEON == 1
 			Serial.print("\n\rFound \'1-Wire\' device with address:\n\r");
 		#endif
 	
@@ -1468,7 +1509,7 @@ void discoverOneWireDevices() {
 		Serial.print("\n\r\n\r");
 	
 		if ( OneWire::crc8( addr, 7) != addr[7]) {
-			#if DEBUG == 1 && SERIALON == 1
+			#if DEBUG == 1 && SERIALINTERFACEON == 1
 			Serial.print("CRC is not valid!\n");
 			#endif
 			return;
@@ -1476,7 +1517,7 @@ void discoverOneWireDevices() {
 		d++;
 	}
 	EEPROM.write(num_ds18b20_devices, d);
-	#if DEBUG == 1 && SERIALON == 1
+	#if DEBUG == 1 && SERIALINTERFACEON == 1
 		Serial.print("\n\r\n\r");
 		Serial.print("Total Devices: ");
 		Serial.println(d);
