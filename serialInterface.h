@@ -9,8 +9,14 @@ void serialInterface() {
       serialCommandString[i] = Serial.read();
     }
     
+    #if DEBUG == 1
+      Serial.print("Sent: ");
+      Serial.println(serialCommandString);
+    #endif
+    
     serialReturnedData = control(serialCommandString);
-    Serial.print("{ Value : ");    
+
+    Serial.print("{ Value : ");        
     Serial.print(serialReturnedData);
     Serial.println(" }");
 

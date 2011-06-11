@@ -4,6 +4,10 @@ int control(char commandString[BUFFERSIZE]) {
     I2CLCD lcd = I2CLCD(0x12, 20, 4);
   #endif
   
+  #if DEBUG == 1
+    Serial.println(commandString);
+  #endif
+  
   int commandToken = atoi(strtok(commandString, "/"));
   
   if(commandToken == 0) {
@@ -45,13 +49,13 @@ int control(char commandString[BUFFERSIZE]) {
 
   #if DIGITALENABLED == 1
     if(commandToken == 5) {
-      int macro_number = atoi(strtok(NULL, "/"));
-      int macro_type = atoi(strtok(NULL, "/"));
-      int watch_pin = atoi(strtok(NULL, "/"));
-      int watch_state = atoi(strtok(NULL, "/"));
-      int output_pin = atoi(strtok(NULL, "/"));
-      int output_action = atoi(strtok(NULL, "/"));
-      int output_time_on = atoi(strtok(NULL, "/"));
+      byte macro_number = atoi(strtok(NULL, "/"));
+      byte macro_type = atoi(strtok(NULL, "/"));
+      byte watch_pin = atoi(strtok(NULL, "/"));
+      byte watch_state = atoi(strtok(NULL, "/"));
+      byte output_pin = atoi(strtok(NULL, "/"));
+      byte output_action = atoi(strtok(NULL, "/"));
+      byte output_time_on = atoi(strtok(NULL, "/"));
       watchDigitalPinDigitalPinOutputMacroSet(macro_number, macro_type, watch_pin, watch_state, output_pin, output_action, output_time_on);
     }
   #endif

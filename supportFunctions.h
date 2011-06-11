@@ -35,10 +35,10 @@ void setPinStatus(unsigned int pin, unsigned int status) {
   }
 }
 
-void watchDigitalPinDigitalPinOutputMacroSet(unsigned int macro_number, unsigned int macro_type, unsigned int watch_pin, unsigned int watch_state, unsigned int output_pin, unsigned int output_action, unsigned int output_time_on){
-  unsigned int memstart = macros_memstart + (macro_number * macros_bytes);
-  unsigned int output_time_on_lb = output_time_on % 256;
-  unsigned int output_time_on_hb = output_time_on / 256;
+void watchDigitalPinDigitalPinOutputMacroSet(int macro_number,  int macro_type, int watch_pin, int watch_state, int output_pin, int output_action, int output_time_on){
+  int memstart = macros_memstart + (macro_number * macros_bytes);
+  int output_time_on_lb = output_time_on % 256;
+  int output_time_on_hb = output_time_on / 256;
 	
   EEPROM.write(memstart, macro_type);
   EEPROM.write((memstart + 1), watch_pin);

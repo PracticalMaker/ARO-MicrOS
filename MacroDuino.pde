@@ -6,9 +6,9 @@ V0.4 - 2011/06/07 - Added Support for Celsius
 V0.4.1 2011/06/08 - Rewrote interface and wrote ethernet interface. Much easier to add new interfaces as all all you do is grab the command line and pass it to the control function
 
 */
-#define DEBUG 0
-#define DEBUGFREEMEMORY 1
-#define DEBUGETHERNETQUERYSTRING 1
+#define DEBUG 1
+#define DEBUGFREEMEMORY 0
+#define DEBUGETHERNETQUERYSTRING 0
 
 #define SPIINTERFACEON 0
 #define SERIALINTERFACEON 1
@@ -132,11 +132,16 @@ void loop() {
   runMacros();
   
   #if SERIALINTERFACEON == 1
-    serialInterface();
+    if(Serial.available() > 0) {
+      serialInterface();
+    }
   #endif  
 
   #if ETHERNETWIZNETW5100INTERFACEON == 1
-    ethernetWiznetW5100Interface();
+    Client client = server.available();
+    if (client) {  
+      ethernetWiznetW5100Interface();
+    }
   #endif
 
   #if I2CLCDENABLED == 1
@@ -148,6 +153,5 @@ void loop() {
     Serial.println(availableMemory());
     delay(500);
   #endif  
-  //delay seems to make the ethernet shield not link up
-  //delay(100);
+
 }
