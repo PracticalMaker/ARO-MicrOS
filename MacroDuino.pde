@@ -6,11 +6,11 @@ V0.4 - 2011/06/07 - Added Support for Celsius
 V0.4.1 2011/06/08 - Rewrote interface and wrote ethernet interface. Much easier to add new interfaces as all all you do is grab the command line and pass it to the control function
 
 */
-#define DEBUG 1
-#define DEBUGFREEMEMORY 0
+#define DEBUG 0
+#define DEBUGFREEMEMORY 1
 #define DEBUGETHERNETQUERYSTRING 1
 
-#define SPIINTERFACEON 1
+#define SPIINTERFACEON 0
 #define SERIALINTERFACEON 1
 #define ETHERNETWIZNETW5100INTERFACEON 1
 
@@ -68,9 +68,7 @@ unsigned int onewire_addresses_bytes = 8;
 uint8_t degree_symbol = 0xDF;
 
 #include <SPI.h>
-#include <Client.h>
 #include <Ethernet.h>
-#include <Server.h>
 #include <Wire.h>
 #include <EEPROM.h>
 #include <OneWire.h>
@@ -88,6 +86,8 @@ uint8_t degree_symbol = 0xDF;
 #if ETHERNETWIZNETW5100INTERFACEON == 1
   byte mac[] = { 0xDE, 0xAD, 0xBE, 0xEF, 0xFE, 0xED };
   byte ip[] = { 192,168,1, 28 };
+  byte gateway[] = { 192, 168, 1, 1 };
+  byte subnet[] = { 255, 255, 255, 0 };
 
   Server server(80);
 #endif
@@ -105,31 +105,30 @@ uint8_t degree_symbol = 0xDF;
 
 
 void setup() {
-  #if SERIALINTERFACEON == 1
-    Serial.begin(9600);  
-  #endif
-  
+  //set pinmodes from eeprom. NEEDS TO BE DONE FIRST! OTHERWISE STUFF LIKE SPI WON'T WORK
+  for(int i = digital_pin_mem_start; i <= digital_pin_mem_end; i++){
+    pinMode(i, EEPROM.read(i));
+  }
+
   #if ETHERNETWIZNETW5100INTERFACEON == 1
     Ethernet.begin(mac, ip);
     server.begin();  
+  #endif  
+
+  #if SERIALINTERFACEON == 1
+    Serial.begin(9600);  
   #endif
-  
+ 
   #if I2CLCDENABLED == 1
     lcd.init();
     lcd.backlight(0);
     lcd.cursorOff();
     lcd.clear();
-  #endif  
-  
-
-  //set pinmodes from eeprom
-  for(int i = digital_pin_mem_start; i <= digital_pin_mem_end; i++){
-    pinMode(i, EEPROM.read(i));
-  }  
+  #endif
 }
 
 
-void loop() {
+void loop() {    
   runMacros();
   
   #if SERIALINTERFACEON == 1
@@ -139,7 +138,7 @@ void loop() {
   #if ETHERNETWIZNETW5100INTERFACEON == 1
     ethernetWiznetW5100Interface();
   #endif
-  
+
   #if I2CLCDENABLED == 1
     printToLCD();
   #endif
@@ -149,6 +148,6 @@ void loop() {
     Serial.println(availableMemory());
     delay(500);
   #endif  
-  
-  delay(100);
+  //delay seems to make the ethernet shield not link up
+  //delay(100);
 }

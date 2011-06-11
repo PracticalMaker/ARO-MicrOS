@@ -7,7 +7,6 @@ void ethernetWiznetW5100Interface() {
   // listen for incoming clients
   Client client = server.available();
   if (client) {
-
     //  reset input buffer
     index = 0;
 

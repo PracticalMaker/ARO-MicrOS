@@ -164,6 +164,7 @@ void runDS1307Macro(unsigned int mem_address){
   }
 }
 
+#if ONEWIREENABLED == 1
 void discoverOneWireDevices() {
   #if ONEWIREENABLED == 1
     OneWire ds(ONEWIRE_PIN);
@@ -268,7 +269,9 @@ int getDS18B20Temp(int device_num) {
 	
   return Tc_100;
 }
+#endif
 
+#if ONEWIREENABLED == 1
 void watchDS18B20DigitalOutputMacroSet(unsigned int macro_number, unsigned int macro_type, unsigned int sensor_num, unsigned int less_greater_equal, unsigned int watch_state, unsigned int output_pin, unsigned int output_action) {
   unsigned int memstart = macros_memstart + (macro_number * macros_bytes);
 	
@@ -280,6 +283,7 @@ void watchDS18B20DigitalOutputMacroSet(unsigned int macro_number, unsigned int m
   EEPROM.write((memstart + 5), output_pin);
   EEPROM.write((memstart + 6), output_action);
 }
+#endif
 
 float getPHValue(unsigned int pin) {
   int analogreadings;
@@ -301,6 +305,7 @@ float getPHValue(unsigned int pin) {
   return ph; 
 }
 
+#if ONEWIREENABLED == 1
 void runDS18B20Macro(unsigned int mem_address) {
   unsigned int temp;
 	
@@ -332,7 +337,7 @@ void runDS18B20Macro(unsigned int mem_address) {
     }	
   }
 }
-
+#endif
 
 
 

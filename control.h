@@ -159,7 +159,7 @@ int control(char commandString[BUFFERSIZE]) {
   #endif
 	
   #if ONEWIREENABLED == 1	
-    if(commandToken == 13){	
+    if(commandToken == 14){	
       unsigned int mem_addresses = (onewire_addresses_memend - onewire_addresses_memstart) / (num_ds18b20_devices * onewire_addresses_bytes);
       //TODO
       for(unsigned int i = 0; i < mem_addresses; i++){
@@ -175,7 +175,7 @@ int control(char commandString[BUFFERSIZE]) {
   #endif 
 	
   #if DS18B20ENABLED == 1
-    if(commandToken == 14){
+    if(commandToken == 15){
       unsigned int temp_sensor_num = atoi(strtok(NULL, "/"));
       
       return getDS18B20Temp(temp_sensor_num);
@@ -184,7 +184,7 @@ int control(char commandString[BUFFERSIZE]) {
   #endif 
 	
   #if I2CLCDENABLED == 1 && DS1307ENABLED == 1
-    if(commandToken == 15){
+    if(commandToken == 16){
       EEPROM.write(i2clcd_time_display, atoi(strtok(NULL, "/")));
 		
       #if I2CLCDENABLED == 1
@@ -196,7 +196,7 @@ int control(char commandString[BUFFERSIZE]) {
   #endif
 	
   #if I2CLCDENABLED == 1 && DS1307ENABLED == 1
-    if(commandToken == 16){
+    if(commandToken == 17){
       unsigned int row = atoi(strtok(NULL, "/"));
       unsigned int col = atoi(strtok(NULL, "/"));
 		
@@ -222,7 +222,7 @@ int control(char commandString[BUFFERSIZE]) {
   #endif
 	
   #if DS18B20ENABLED == 1
-    if(commandToken == 17){
+    if(commandToken == 18){
       unsigned int row = atoi(strtok(NULL, "/"));
       unsigned int col = atoi(strtok(NULL, "/"));		
 		
@@ -247,7 +247,7 @@ int control(char commandString[BUFFERSIZE]) {
   #endif
 
   #if DS18B20ENABLED == 1	
-    if(commandToken == 18){
+    if(commandToken == 19){
       unsigned int sensor_num = atoi(strtok(NULL, "/"));
 		
       #if DEBUG == 1 && SERIALINTERFACEON == 1
@@ -265,7 +265,7 @@ int control(char commandString[BUFFERSIZE]) {
   #endif
 		
   #if DS18B20ENABLED == 1
-    if(commandToken == 19){
+    if(commandToken == 20){
       bool display_temp = atoi(strtok(NULL, "/"));
 		
       #if DEBUG == 1 && SERIALINTERFACEON == 1
@@ -283,7 +283,7 @@ int control(char commandString[BUFFERSIZE]) {
   #endif
 
   #if DS18B20ENABLED == 1
-    if(commandToken == 20){
+    if(commandToken == 21){
       unsigned int row = atoi(strtok(NULL, "/"));
       unsigned int col = atoi(strtok(NULL, "/"));
 		
@@ -308,7 +308,7 @@ int control(char commandString[BUFFERSIZE]) {
   #endif
 
   #if DS18B20ENABLED == 1	
-    if(commandToken == 21){
+    if(commandToken == 22){
       unsigned int sensor_num = atoi(strtok(NULL, "/"));
 		
       #if DEBUG == 1 && SERIALINTERFACEON == 1
@@ -326,7 +326,7 @@ int control(char commandString[BUFFERSIZE]) {
   #endif
 		
   #if DS18B20ENABLED == 1
-    if(commandToken == 22){
+    if(commandToken == 23){
       unsigned int display = atoi(strtok(NULL, "/"));
 		
       #if DEBUG == 1 && SERIALINTERFACEON == 1
@@ -344,7 +344,7 @@ int control(char commandString[BUFFERSIZE]) {
   #endif
 	
   #if DS18B20ENABLED == 1
-    if(commandToken == 23){
+    if(commandToken == 24){
       unsigned int col = atoi(strtok(NULL, "/"));
       unsigned int row = atoi(strtok(NULL, "/"));
 		
@@ -369,7 +369,7 @@ int control(char commandString[BUFFERSIZE]) {
   #endif
 
   #if DS18B20ENABLED == 1	
-    if(commandToken == 24){
+    if(commandToken == 25){
       unsigned int sensor_num = atoi(strtok(NULL, "/"));
 		
       #if DEBUG == 1 && SERIALINTERFACEON == 1
@@ -387,7 +387,7 @@ int control(char commandString[BUFFERSIZE]) {
   #endif
 		
   #if DS18B20ENABLED == 1
-    if(commandToken == 25){
+    if(commandToken == 26){
       unsigned int display = atoi(strtok(NULL, "/"));
 		
       #if DEBUG == 1 && SERIALINTERFACEON == 1
@@ -405,7 +405,7 @@ int control(char commandString[BUFFERSIZE]) {
   #endif
 	
   #if DS18B20ENABLED == 1
-    if(commandToken == 26){
+    if(commandToken == 27){
       int macro_number = atoi(strtok(NULL, "/"));
       int macro_type = atoi(strtok(NULL, "/"));
       int sensor_num = atoi(strtok(NULL, "/"));
@@ -421,7 +421,7 @@ int control(char commandString[BUFFERSIZE]) {
   #endif
 	
   #if PHENABLED == 1
-    if(commandToken == 27){
+    if(commandToken == 28){
       int watch_pin = atoi(strtok(NULL, "/"));
 
       return (getPHValue(watch_pin) * 100);
@@ -429,7 +429,7 @@ int control(char commandString[BUFFERSIZE]) {
   #endif
 
   #if PHENABLED == 1 && I2CLCDENABLED == 1	
-    if(commandToken == 28){
+    if(commandToken == 29){
       unsigned int row = atoi(strtok(NULL, "/"));
       unsigned int col = atoi(strtok(NULL, "/"));
 		
@@ -454,7 +454,7 @@ int control(char commandString[BUFFERSIZE]) {
   #endif
 	
   #if PHENABLED == 1 && I2CLCDENABLED == 1
-    if(commandToken == 29){
+    if(commandToken == 30){
       unsigned int display = atoi(strtok(NULL, "/"));
 		
       #if DEBUG == 1 && SERIALINTERFACEON == 1
