@@ -8,7 +8,7 @@ V0.4.1 2011/06/08 - Rewrote interface and wrote ethernet interface. Much easier 
 */
 #define DEBUG 1
 #define DEBUGFREEMEMORY 0
-#define DEBUGETHERNETQUERYSTRING 0
+#define DEBUGETHERNETQUERYSTRING 1
 
 #define SPIINTERFACEON 0
 #define SERIALINTERFACEON 1
@@ -24,7 +24,7 @@ V0.4.1 2011/06/08 - Rewrote interface and wrote ethernet interface. Much easier 
 
 #define CELSIUS 0
 
-#define BUFFERSIZE 32
+#define BUFFERSIZE 64
 #define ARDUINO_MEM_ADDR 0
 #define ONEWIRE_PIN 2
 #define ARDUINO_VOLTAGE 5.06
@@ -75,6 +75,7 @@ uint8_t degree_symbol = 0xDF;
 #include <I2CLCD.h>
 #include <DS1307.h>
 #include <OneWire.h>
+#include <aJSON.h>
 #include "supportFunctions.h"
 #include "control.h"
 #include "ethernetInterface.h"

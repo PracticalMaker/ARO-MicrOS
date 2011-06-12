@@ -4,9 +4,8 @@ int control(char commandString[BUFFERSIZE]) {
     I2CLCD lcd = I2CLCD(0x12, 20, 4);
   #endif
   
-  #if DEBUG == 1
-    Serial.println(commandString);
-  #endif
+  Serial.print("control: ");
+  Serial.println(commandString);
   
   int commandToken = atoi(strtok(commandString, "/"));
   

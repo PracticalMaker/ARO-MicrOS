@@ -24,7 +24,7 @@ void ethernetWiznetW5100Interface() {
             index = BUFFERSIZE -1;
 
           continue;
-        }
+        }         
 
         /*
         //  convert clientline into a proper
@@ -43,45 +43,38 @@ void ethernetWiznetW5100Interface() {
          //  get the first two parameters
          //char *commandLine = strtok(clientline,"/");
          */
-        char commandString[BUFFERSIZE];
+        char *commandString;
+        char *jsonpCallback;
         int num_spaces = 0;
         int counter = 0;
 
-        for(int i=0; i<=BUFFERSIZE; i++) { 
-          if(num_spaces == 1) {
-            commandString[counter] = clientline[i];
-            counter++;
-          }  
-          if(clientline[i] == 0x20) {
-            num_spaces++;
-          }     
-        }     
+        commandString = strtok(clientline, " ");
+        //commandString = strtok(commandString, "?");
+        commandString = strtok(NULL, "=");     
+        jsonpCallback = strtok(NULL, " ");
 
-#if DEBUGETHERNETQUERYSTRING == 1
-        Serial.println(commandString);
-#endif        
+        String jsonpCallbackString = String(jsonpCallback);
+        
+
+        #if DEBUGETHERNETQUERYSTRING == 1
+                Serial.println(commandString);
+                Serial.println(jsonpCallbackString);
+        #endif        
+        
         delay(1);
           client.println("HTTP/1.1 200 OK");
-          client.println("Content-Type: text/html");
+          //client.println("Content-type: text/json");
+          //client.println("Content-type: application/json");
+          client.println("Content-Type: text/javascript");          
           client.println();
 
         ethernetReturnValue = control(commandString);
 
-
-
-        if(ethernetReturnValue){
-          client.print("{ Value : ");
-          client.print(ethernetReturnValue);          
-          client.println(" }");
-        } 
-        else {
-          //  error
-          Serial.println("erroring");
-          client.println("HTTP/1.1 404 Not Found");
-          client.println("Content-Type: text/html");
-          client.println();
-
-        }
+        client.print(jsonpCallbackString);
+        client.print("({\"value\":");
+        client.print(ethernetReturnValue);
+        client.println("})");
+       
         break;
 
       }
