@@ -1,31 +1,28 @@
 void serialInterface() {
   char serialCommandString[BUFFERSIZE];
   int serialReturnedData;
+  byte inChar;
+  byte index = 0;
   
-  if(Serial.available() > 0){		
-    unsigned int numSerialAvailable = Serial.available();
-		
-    for(unsigned int i = 0; i < numSerialAvailable; i++){
-      serialCommandString[i] = Serial.read();
+  while(Serial.available() > 0) {	
+    inChar = Serial.read();
+    delay(1);
+    if(inChar != '\n') {
+      serialCommandString[index] = inChar;
+      #if DEBUG == 1
+        Serial.print("Received: ");
+        Serial.println(serialCommandString[index]);
+      #endif
+      index++;
+      serialCommandString[index] = '\0';
+    } else { 
+      serialReturnedData = control(serialCommandString);
+  
+      Serial.print("{ Value : ");        
+      Serial.print(serialReturnedData);
+      Serial.println(" }");
+      
+      Serial.flush();
     }
-    
-    #if DEBUG == 1
-      Serial.print("Sent: ");
-      Serial.println(serialCommandString);
-    #endif
-    
-    serialReturnedData = control(serialCommandString);
-
-    Serial.print("{ Value : ");        
-    Serial.print(serialReturnedData);
-    Serial.println(" }");
-
-  
-    for(int i=0; i<=BUFFERSIZE; i++) {
-      serialCommandString[i] = '\0'; 
-    }    
-    
-    
   }
-  Serial.flush();
 }

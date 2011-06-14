@@ -4,12 +4,19 @@ int control(char commandString[BUFFERSIZE]) {
     I2CLCD lcd = I2CLCD(0x12, 20, 4);
   #endif
   
-  Serial.print("control: ");
-  Serial.println(commandString);
-  
   int commandToken = atoi(strtok(commandString, "/"));
   
-  if(commandToken == 0) {
+  #if DEBUG == 1
+    Serial.print("Token: ");
+    Serial.println(commandToken);
+  #endif
+  
+  #if DEBUG == 1
+    Serial.print("Command: ");
+    Serial.println(commandToken);
+  #endif
+  
+  if(commandToken == 255) {
     return EEPROM.read(ARDUINO_MEM_ADDR);
   }	
 

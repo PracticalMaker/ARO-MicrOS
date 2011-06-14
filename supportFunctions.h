@@ -18,7 +18,6 @@ int combineValue(unsigned int lb, unsigned int hb) {
 void resetMacros(){
   for(unsigned int i = macros_memstart; i <= macros_memend; i++){
     EEPROM.write(i, 0);
-    delay(5);
   }
 }
 
@@ -294,6 +293,7 @@ float getPHValue(unsigned int pin) {
   analogreadings = 0;
   for(i = 1; i < 50; i++){
     analogreadings += analogRead(pin);
+    // give analog pin time to recover
     delay(10);
   }
   analogreadings /= i;

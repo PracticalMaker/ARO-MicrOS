@@ -6,14 +6,19 @@ V0.4 - 2011/06/07 - Added Support for Celsius
 V0.4.1 2011/06/08 - Rewrote interface and wrote ethernet interface. Much easier to add new interfaces as all all you do is grab the command line and pass it to the control function
 
 */
-#define DEBUG 1
+#define DEBUG 0
 #define DEBUGFREEMEMORY 0
-#define DEBUGETHERNETQUERYSTRING 1
+#define DEBUGETHERNETQUERYSTRING 0
 
-#define SPIINTERFACEON 0
+/********************
+ONLY ENABLE ONE INTERFACE AT A TIME! Enabling more than one will result in weird behaviour
+*********************/
 #define SERIALINTERFACEON 1
 #define ETHERNETWIZNETW5100INTERFACEON 1
 
+/********************
+These define statements enable different functions of the code.
+*********************/
 #define DIGITALENABLED 1
 #define ANALOGENABLED 1
 #define DS1307ENABLED 1
@@ -32,8 +37,8 @@ V0.4.1 2011/06/08 - Rewrote interface and wrote ethernet interface. Much easier 
 #define PH_GAIN 9.6525
 
 
-byte digital_pin_mem_start = 2;
-byte digital_pin_mem_end = 13;
+int digital_pin_mem_start = 0;
+int digital_pin_mem_end = 13;
 
 unsigned int macros_memstart = 100;
 unsigned int macros_memend = 400;
@@ -116,9 +121,7 @@ void setup() {
     server.begin();  
   #endif  
 
-  #if SERIALINTERFACEON == 1
-    Serial.begin(9600);  
-  #endif
+
  
   #if I2CLCDENABLED == 1
     lcd.init();
@@ -126,12 +129,15 @@ void setup() {
     lcd.cursorOff();
     lcd.clear();
   #endif
+  
+  #if SERIALINTERFACEON == 1
+    Serial.begin(9600);
+    Serial.flush();
+  #endif  
 }
 
 
 void loop() {    
-  runMacros();
-  
   #if SERIALINTERFACEON == 1
     if(Serial.available() > 0) {
       serialInterface();
@@ -149,10 +155,11 @@ void loop() {
     printToLCD();
   #endif
   
+  runMacros();  
+  
   #if DEBUG == 1 && DEBUGFREEMEMORY == 1
     Serial.print("Free Memory: ");
     Serial.println(availableMemory());
-    delay(500);
   #endif  
 
 }
