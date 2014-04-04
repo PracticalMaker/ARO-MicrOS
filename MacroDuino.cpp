@@ -382,86 +382,11 @@ char *MacroDuino::control(char *returnData, char *commandString) {
     int counter = 0;
     returnData[counter] = itoa_buffer[0];
     counter++;
-    returnData[counter] = '\0';
-    counter++;
     delay(1);
     
     return returnData;
   }
 	#endif
-
-	#if defined(OneWire_hh) && defined(COMMAND_GETDS18B20TEMP_ENABLED)
-  if(command == "getds18b20temp"){	
-    int mem_addresses = (onewire_addresses_memend - onewire_addresses_memstart) / onewire_addresses_bytes;  
-    int counter = 0;
-    int device_num = 0;
-    returnData[counter] = '[';
-    counter++;
-    for(int i = 0; i < mem_addresses; i++){
-      returnData[counter] = '{';
-      counter++;
-      returnData[counter] = 'D';
-      counter++;         
-      returnData[counter] = 'E';
-      counter++;         
-      returnData[counter] = 'V';
-      counter++;
-      returnData[counter] = 'I';
-      counter++;
-      returnData[counter] = 'C';
-      counter++;
-      returnData[counter] = 'E';
-      counter++;
-      returnData[counter] = ':';
-      counter++;
-      returnData[counter] = device_num + '0';
-      counter++;
-      returnData[counter] = ',';
-      counter++;
-      returnData[counter] = 'V';
-      counter++;
-      returnData[counter] = 'A';
-      counter++;
-      returnData[counter] = 'L';
-      counter++;
-      returnData[counter] = 'U';         
-      counter++;
-      returnData[counter] = 'E';         
-      counter++;
-      returnData[counter] = ':';                  
-      counter++;
-      returnData[counter] = '"';
-      counter++;         
-      for(int j = 0; j < 8; j++){
-        char itoa_buffer[5];
-        itoa(EEPROM.read((onewire_addresses_memstart + (i * onewire_addresses_bytes) + j)), itoa_buffer, 10);
-        returnData[counter] = itoa_buffer[0];
-        if(itoa_buffer[1] != NULL) {
-          counter++;
-          returnData[counter] = itoa_buffer[1]; 
-        }
-        counter++;
-        returnData[counter] = '-';
-        counter++;
-      }
-      counter--;
-      returnData[counter] = '"';
-      counter++;         
-      returnData[counter] = '}';
-      counter++;
-      returnData[counter] = ',';
-      counter++;
-      returnData[counter] = '\r\n';
-      counter++;
-      device_num++;
-    }
-    returnData[counter] = ']';
-    counter++;
-    delay(1);
-
-    return returnData;
-  }
-#endif 
 
 	#if defined(OneWire_h) && defined(COMMAND_GETDS18B20TEMP_ENABLED)
   if(command == "getds18b20temp"){
@@ -531,7 +456,30 @@ char *MacroDuino::control(char *returnData, char *commandString) {
 
     return returnData;		
   }
-#endif 
+	#endif
+
+	#if defined(OneWire_h) && defined(COMMAND_PUBLISHDS18B20TEMP_ENABLED)
+  if(command == "publishds18b20temp"){
+    char *chartemp_sensor_num = strtok(NULL, "/");
+    int temp_sensor_num = atoi(chartemp_sensor_num);
+
+		if((PUBLISH_ONEWIRE_TEMP_START + temp_sensor_num) <= PUBLISH_ONEWIRE_TEMP_END) {
+			EEPROM.write((PUBLISH_ONEWIRE_TEMP_START + temp_sensor_num), 1);
+		}
+  }	
+	#endif
+
+	#if defined(OneWire_h) && defined(COMMAND_PUBLISHDS18B20TEMP_ENABLED)
+  if(command == "unpublishds18b20temp"){
+    char *chartemp_sensor_num = strtok(NULL, "/");
+    int temp_sensor_num = atoi(chartemp_sensor_num);
+
+		if((PUBLISH_ONEWIRE_TEMP_START + temp_sensor_num) <= PUBLISH_ONEWIRE_TEMP_END) {
+			EEPROM.write((PUBLISH_ONEWIRE_TEMP_START + temp_sensor_num), 0);
+		}
+  }	
+	#endif
+	
 
 #ifdef PHENABLED
   if(commandToken == 28){
@@ -1280,8 +1228,32 @@ void controlTLC5940(int tlc_pin_num, int tlc_action) {
 }
 #endif
 
-void runMacros() {
-  int macro_mem_address_start;
+void MacroDuino::runMacros() {
+	#ifdef cc3000_PubSubClient_h
+	for(int j = PUBLISH_ONEWIRE_TEMP_START; j <= PUBLISH_ONEWIRE_TEMP_END; j++) {
+		if(EEPROM.read(j) == 1) {		
+			if(mqttclient.connected()) {
+				char chartemp[10];
+				//PUBLISH_ONEWIRE_TEMP_END + j
+				int temp = this->getDS18B20Temp(0);
+				itoa(temp, chartemp, 10);
+				
+				char device[10];
+				int deviceNum = j - PUBLISH_ONEWIRE_TEMP_START;
+				itoa(deviceNum, device, 10);
+				
+				memset(mqttString, 0, sizeof mqttString); 
+				strcat(mqttString, MQTT_Username);
+				strcat(mqttString, "/"); 
+				strcat(mqttString, this->deviceID());
+				strcat(mqttString, "/publish/temp/");
+				strcat(mqttString, device);
+				mqttclient.publish(mqttString, chartemp);
+			}
+		}
+	}
+	#endif
+/*  int macro_mem_address_start;
   for(unsigned int i = 0; i < ((MACROS_END - MACROS_START) / MACRO_BYTE_LENGTH); i++) {
     macro_mem_address_start = MACROS_START + (i * MACRO_BYTE_LENGTH);
     if(EEPROM.read(macro_mem_address_start) == 1) {    
@@ -1306,7 +1278,7 @@ void runMacros() {
         #endif
       }
     }
-  }
+  }*/
 }
 
 /**************************************************************************/
@@ -1314,6 +1286,7 @@ void runMacros() {
     @brief  Tries to read the IP address and other connection details
 */
 /**************************************************************************/
+#ifdef ADAFRUIT_CC3000_H
 bool MacroDuino::displayConnectionDetails(Adafruit_CC3000& cc3000) {
   uint32_t ipAddress, netmask, gateway, dhcpserv, dnsserv;
   
@@ -1337,6 +1310,7 @@ bool MacroDuino::displayConnectionDetails(Adafruit_CC3000& cc3000) {
     return true;
   }
 }
+#endif
 
 /**************************************************************************/
 /*!
@@ -1388,6 +1362,7 @@ char* MacroDuino::deviceID() {
  @brief  Tries to read the CC3000's internal firmware patch ID
  */
 /**************************************************************************/
+#ifdef ADAFRUIT_CC3000_H
 uint16_t MacroDuino::cc3000CheckFirmwareVersion(Adafruit_CC3000& cc3000) {
   uint8_t major, minor;
   uint16_t version;
@@ -1404,13 +1379,15 @@ uint16_t MacroDuino::cc3000CheckFirmwareVersion(Adafruit_CC3000& cc3000) {
   #endif
   return version;
 }
+#endif
 
 /**************************************************************************/
 /*!
  @brief  Tries to read the IP address and other connection details
  */
 /**************************************************************************/
-bool displayConnectionDetails(Adafruit_CC3000& cc3000)
+#ifdef ADAFRUIT_CC3000_H
+bool MacroDuino::displayConnectionDetails(Adafruit_CC3000& cc3000)
 {
   uint32_t ipAddress, netmask, gateway, dhcpserv, dnsserv;
 
@@ -1439,6 +1416,7 @@ bool displayConnectionDetails(Adafruit_CC3000& cc3000)
     return true;
   }
 }
+#endif
 
 #ifdef COMMAND_CONFIGUREISE_ENABLED
 bool MacroDuino::configureISE(byte pin, int value1, int value2) {
@@ -1497,18 +1475,20 @@ bool MacroDuino::configureISE(byte pin, int value1, int value2) {
   oldValue = 1;
   newValue = 0; 
 
+	#ifdef cc3000_PubSubClient_h
 	if(mqttclient.connected()) {
 		memset(mqttString, 0, sizeof mqttString); 
 		strcat(mqttString, MQTT_Username);
 		strcat(mqttString, "/"); 
 		strcat(mqttString, "configureise");
-		mqttclient.publish(mqttString, "Place probe in second solution.");
+		mqttclient.publish(mqttString, "SECONDSTAGE");
 	}
+	#endif
 	#ifdef DEBUG_SERIAL
 	Serial.println("Now configuring second solution");
 	#endif
 	
-	delay(30000);
+	delay(16000);
 	
   //second calibration solution
 	EEPROM.write(calibration_solution_second, value2);
@@ -1543,8 +1523,8 @@ bool MacroDuino::configureISE(byte pin, int value1, int value2) {
     delay(500);
   }
   matchCount = 0;
-  EEPROM.write(calibration_value_second, lowValue(newValue));
-  EEPROM.write(calibration_value_second+1, highValue(newValue));
+  EEPROM.write(calibration_value_second, this->lowValue(newValue));
+  EEPROM.write(calibration_value_second+1, this->highValue(newValue));
   
   return true;  
 }
@@ -1589,5 +1569,176 @@ float MacroDuino::readISE(byte pin) {
   
   float y = (m*(float)reading) + b;
   return y;
+}
+#endif
+
+#if defined(ADAFRUIT_CC3000_H)
+bool MacroDuino::connectCC3000(Adafruit_CC3000& cc3000, Adafruit_CC3000_Client& client, const char* wlan_ssid, const char* wlan_pass, uint8_t wlan_security, bool reconnect) {
+	if(reconnect == true) {
+		#ifdef DEBUG_SERIAL
+		Serial.println("Rebooting cc3000");
+		#endif
+		cc3000.reboot();
+		#ifdef DEBUG_SERIAL
+		Serial.println("cc3000 Rebooted");
+		#endif		
+	}
+
+  if (!cc3000.begin()) {
+    #ifdef DEBUG_SERIAL
+    Serial.println(F("Unable to initialise the CC3000! Check your wiring?"));
+    #endif
+    for(;;);
+  }
+
+  if ((this->cc3000CheckFirmwareVersion(cc3000) != 0x113) && (this->cc3000CheckFirmwareVersion(cc3000) != 0x118)) {
+    //TODO have an error LED blink if wrong firmware
+    #ifdef DEBUG_SERIAL
+    Serial.println(F("Wrong firmware version!"));
+    #endif
+    for(;;);
+  } else {
+    #ifdef DEBUG_SERIAL
+    Serial.print("Firmware V.");
+    Serial.println(this->cc3000CheckFirmwareVersion(cc3000));
+    #endif
+  }
+
+  #ifdef DEBUG_SERIAL
+  Serial.println(F("\nDeleting old connection profiles"));
+  #endif
+  
+  if (!cc3000.deleteProfiles()) {
+    #ifdef DEBUG_SERIAL
+    Serial.println(F("Failed to deleteProfiles()!"));
+    #endif
+    while(1);
+  }
+
+  #ifdef DEBUG_SERIAL
+  Serial.print(F("\nAttempting to connect to ")); 
+  Serial.println(wlan_ssid);
+  #endif
+
+  /* NOTE: Secure connections are not available in 'Tiny' mode! */
+  if (!cc3000.connectToAP(wlan_ssid, wlan_pass, wlan_security)) {
+    #ifdef DEBUG_SERIAL
+    Serial.println(F("Failed to connect to SSID!"));
+    #endif
+    while(1);
+  }
+
+  #ifdef DEBUG_SERIAL
+  Serial.println(F("Connected!"));
+  /* Wait for DHCP to complete */
+  Serial.println(F("Request DHCP"));
+  #endif
+  
+  while (!cc3000.checkDHCP()) {
+    delay(100); // ToDo: Insert a DHCP timeout!
+  }
+
+  /* Display the IP address DNS, Gateway, etc. */
+  while (!this->displayConnectionDetails(cc3000)) {
+    delay(1000);
+  }
+}
+#endif
+
+#if defined(cc3000_PubSubClient_h) && defined(ADAFRUIT_CC3000_H)
+bool MacroDuino::connectMQTT(Adafruit_CC3000& cc3000, Adafruit_CC3000_Client& client, cc3000_PubSubClient& mqttclient, char* MQTT_Username, char* MQTT_Password, uint32_t server) {
+  // connect to the broker
+  if (!client.connected()) {
+    client = cc3000.connectTCP(server, 1883);
+    #ifdef DEBUG_SERIAL
+    Serial.println("Returned");
+    #endif
+  }
+  
+  // did that last thing work? sweet, let's do something
+  if(client.connected()) {
+    if (mqttclient.connect(this->deviceID(), MQTT_Username, MQTT_Password)) {
+      memset(mqttString, 0, sizeof mqttString); 
+      strcat(mqttString, MQTT_Username);
+      strcat(mqttString, "/"); 
+      strcat(mqttString, "checkin");
+      mqttclient.publish(mqttString, this->deviceID());
+      memset(mqttString, 0, sizeof mqttString); 
+      strcat(mqttString, MQTT_Username);
+      strcat(mqttString, "/");
+      strcat(mqttString, this->deviceID());      
+      strcat(mqttString, "/");      
+      strcat(mqttString, "control");
+      #ifdef DEBUG_SERIAL
+      Serial.println(mqttString);
+      #endif
+      mqttclient.subscribe(mqttString);
+      return true;
+    }
+  } else {
+  	return false;
+  } 
+}
+#endif
+
+/*
+void MacroDuino::cc3000MQTTInterfaceCallback(char* topic, byte* payload, unsigned int length) {
+  char mqttReturnData[MQTT_MAX_PACKET_SIZE];
+
+  char commandString[length+1];
+  for(byte j = 0; j < length; j++) {
+    commandString[j] = payload[j];
+    commandString[j+1] = '\0';
+  }
+  this->control(mqttReturnData, commandString);
+  
+  memset(mqttString, 0, sizeof mqttString); 
+  strcat(mqttString, MQTT_Username);
+  strcat(mqttString, "/");
+  strcat(mqttString, this->deviceID()); 
+  strcat(mqttString, "/");  
+  strcat(mqttString, strtok(commandString, "/"));
+  mqttclient.publish(mqttString, mqttReturnData);
+}
+*/
+
+void MacroDuino::serialInterface() {
+  char serialCommandString[BUFFERSIZE];
+  char serialReturnData[BUFFERSIZE];
+	memset(serialReturnData, 0, sizeof serialReturnData);
+	memset(serialCommandString, 0, sizeof serialCommandString);	
+  byte inByte;
+  byte index = 0;
+  
+  while(Serial.available() > 0) {	
+    inByte = Serial.read();
+    serialCommandString[index] = inByte;
+    #ifdef DEBUG_SERIAL
+      Serial.print("Received: ");
+      Serial.println(serialCommandString[index]);
+    #endif
+    delay(1);
+    index++;
+    serialCommandString[index] = '\0';
+  }
+
+  Serial.println(this->control(serialReturnData, serialCommandString));
+
+  return;
+}
+
+#if defined(cc3000_PubSubClient_h) && defined(ADAFRUIT_CC3000_H)
+void MacroDuino::publishCheckin() {	
+  this->checkinCurrentMillis = millis();
+  if ((this->checkinCurrentMillis - this->checkinPreviousMillis) >= 30000){
+    this->checkinPreviousMillis = this->checkinCurrentMillis;     
+    memset(mqttString, 0, sizeof mqttString); 
+    strcat(mqttString, MQTT_Username);
+    strcat(mqttString, "/");
+    strcat(mqttString, "checkin");
+    if(mqttclient.connected()) {
+      mqttclient.publish(mqttString, this->deviceID());
+    }
+  }
 }
 #endif
