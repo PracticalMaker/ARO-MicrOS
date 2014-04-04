@@ -1,4 +1,4 @@
-#define DEBUG_SERIAL
+//#define DEBUG_SERIAL
 
 // Which commands do you want enabled?
 #define COMMAND_IDENTIFY_ENABLED
