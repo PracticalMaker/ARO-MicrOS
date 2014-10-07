@@ -1,11 +1,11 @@
-#include "MacroDuino.h"
+#include "ARO_MicrOS.h"
 #include "variables.h"
 
-MacroDuino::MacroDuino() {
+ARO_MicrOS::ARO_MicrOS() {
 
 }
 
-char *MacroDuino::control(char *returnData, char *commandString) {
+char *ARO_MicrOS::control(char *returnData, char *commandString) {
   /******* NOTES  
    * for control functions with an eeprom.write a delay before returning is needed otherwise no data is returned
    * returnData needs to be setup as follows
@@ -775,33 +775,33 @@ float c2f(float cel) {
   return (cel * (9.0/5.0)) + (float)3200;
 }
 
-int MacroDuino::highValue(int value) {
+int ARO_MicrOS::highValue(int value) {
   return value / 256;
 }
 
-int MacroDuino::lowValue(int value) {
+int ARO_MicrOS::lowValue(int value) {
   return value % 256; 
 }
 
-int MacroDuino::combineValue(unsigned int lb, unsigned int hb) {
+int ARO_MicrOS::combineValue(unsigned int lb, unsigned int hb) {
   return ((hb * 256) + lb);
 }
 
 
-void MacroDuino::resetMacros(){
+void ARO_MicrOS::resetMacros(){
   for(int i = MACROS_START; i <= MACROS_END; i++){
     EEPROM.write(i, 0);
   }
 }
 
-void MacroDuino::pinModeSet(byte pin, byte mode) {
+void ARO_MicrOS::pinModeSet(byte pin, byte mode) {
   if((DIGITAL_PIN_START + pin) <= DIGITAL_PIN_END) {
     EEPROM.write(DIGITAL_PIN_START+pin, mode);
     pinMode(pin, mode);
   }
 }
 
-void MacroDuino::setPinStatus(byte pin, byte pinstatus) {
+void ARO_MicrOS::setPinStatus(byte pin, byte pinstatus) {
   if(pinstatus <= 1) {
     digitalWrite(pin, pinstatus);
   }
@@ -982,7 +982,7 @@ void runAnalogMacro(unsigned int mem_address){
 #endif
 
 #ifdef _RTCLIB_H_
-void MacroDuino::DS1307SetTime(int year, byte month, byte day, byte hour, byte minute, byte second) {
+void ARO_MicrOS::DS1307SetTime(int year, byte month, byte day, byte hour, byte minute, byte second) {
   rtc.adjust(DateTime(year, month, day, hour, minute, second));
 }
 #endif
@@ -1047,7 +1047,7 @@ void runDS1307Macro(unsigned int mem_address){
 #endif
 
 #if defined(OneWire_h) && defined(COMMAND_DISCOVERONEWIREDEVICES_ENABLED)
-int MacroDuino::discoverOneWireDevices() {
+int ARO_MicrOS::discoverOneWireDevices() {
   OneWire ds(ONEWIRE_PIN);
 
   byte i;
@@ -1083,7 +1083,7 @@ int MacroDuino::discoverOneWireDevices() {
 #endif
 
 #if defined(OneWire_h) && defined(COMMAND_GETDS18B20TEMP_ENABLED)
-int MacroDuino::getDS18B20Temp(int device_num) {
+int ARO_MicrOS::getDS18B20Temp(int device_num) {
   OneWire ds(ONEWIRE_PIN);
 
   byte i;
@@ -1228,7 +1228,7 @@ void controlTLC5940(int tlc_pin_num, int tlc_action) {
 }
 #endif
 
-void MacroDuino::runMacros() {
+void ARO_MicrOS::runMacros() {
 	#ifdef cc3000_PubSubClient_h
 	for(int j = PUBLISH_ONEWIRE_TEMP_START; j <= PUBLISH_ONEWIRE_TEMP_END; j++) {
 		if(EEPROM.read(j) == 1) {		
@@ -1287,7 +1287,7 @@ void MacroDuino::runMacros() {
 */
 /**************************************************************************/
 #ifdef ADAFRUIT_CC3000_H
-bool MacroDuino::displayConnectionDetails(Adafruit_CC3000& cc3000) {
+bool ARO_MicrOS::displayConnectionDetails(Adafruit_CC3000& cc3000) {
   uint32_t ipAddress, netmask, gateway, dhcpserv, dnsserv;
   
   if(!cc3000.getIPAddress(&ipAddress, &netmask, &gateway, &dhcpserv, &dnsserv))
@@ -1333,7 +1333,7 @@ bool MacroDuino::displayConnectionDetails(Adafruit_CC3000& cc3000) {
 }*/
 
 #ifdef EEPROM_h
-void MacroDuino::setDeviceAddress() {
+void ARO_MicrOS::setDeviceAddress() {
   if(EEPROM.read(ADDRESS_START) != 253) {
     EEPROM.write(ADDRESS_START, 253); 
     for(byte j = ADDRESS_START+1; j < ADDRESS_END; j++) {
@@ -1352,7 +1352,7 @@ void MacroDuino::setDeviceAddress() {
   }
 }
 
-char* MacroDuino::deviceID() {
+char* ARO_MicrOS::deviceID() {
 	return this->_deviceID;
 }
 #endif
@@ -1363,7 +1363,7 @@ char* MacroDuino::deviceID() {
  */
 /**************************************************************************/
 #ifdef ADAFRUIT_CC3000_H
-uint16_t MacroDuino::cc3000CheckFirmwareVersion(Adafruit_CC3000& cc3000) {
+uint16_t ARO_MicrOS::cc3000CheckFirmwareVersion(Adafruit_CC3000& cc3000) {
   uint8_t major, minor;
   uint16_t version;
 
@@ -1387,7 +1387,7 @@ uint16_t MacroDuino::cc3000CheckFirmwareVersion(Adafruit_CC3000& cc3000) {
  */
 /**************************************************************************/
 #ifdef ADAFRUIT_CC3000_H
-bool MacroDuino::displayConnectionDetails(Adafruit_CC3000& cc3000)
+bool ARO_MicrOS::displayConnectionDetails(Adafruit_CC3000& cc3000)
 {
   uint32_t ipAddress, netmask, gateway, dhcpserv, dnsserv;
 
@@ -1419,7 +1419,7 @@ bool MacroDuino::displayConnectionDetails(Adafruit_CC3000& cc3000)
 #endif
 
 #ifdef COMMAND_CONFIGUREISE_ENABLED
-bool MacroDuino::configureISE(byte pin, int value1, int value2) {
+bool ARO_MicrOS::configureISE(byte pin, int value1, int value2) {
 	if((ISE_CONF_START + (pin * ISE_CONF_BYTES)) > ISE_CONF_END) {
 		//out of address space
 		return false;
@@ -1531,7 +1531,7 @@ bool MacroDuino::configureISE(byte pin, int value1, int value2) {
 #endif
 
 #ifdef COMMAND_READISE_ENABLED
-float MacroDuino::readISE(byte pin) {
+float ARO_MicrOS::readISE(byte pin) {
   int y1 = EEPROM.read((pin * ISE_CONF_BYTES) + ISE_CONF_START);
   int y2 = EEPROM.read((pin * ISE_CONF_BYTES) + ISE_CONF_START + 1);
   int x1 = this->combineValue(EEPROM.read((pin * ISE_CONF_BYTES) + ISE_CONF_START + 2), EEPROM.read((pin * ISE_CONF_BYTES) + ISE_CONF_START + 3));  
@@ -1573,7 +1573,7 @@ float MacroDuino::readISE(byte pin) {
 #endif
 
 #if defined(ADAFRUIT_CC3000_H)
-bool MacroDuino::connectCC3000(Adafruit_CC3000& cc3000, Adafruit_CC3000_Client& client, const char* wlan_ssid, const char* wlan_pass, uint8_t wlan_security, bool reconnect) {
+bool ARO_MicrOS::connectCC3000(Adafruit_CC3000& cc3000, Adafruit_CC3000_Client& client, const char* wlan_ssid, const char* wlan_pass, uint8_t wlan_security, bool reconnect) {
 	if(reconnect == true) {
 		#ifdef DEBUG_SERIAL
 		Serial.println("Rebooting cc3000");
@@ -1646,7 +1646,7 @@ bool MacroDuino::connectCC3000(Adafruit_CC3000& cc3000, Adafruit_CC3000_Client& 
 #endif
 
 #if defined(cc3000_PubSubClient_h) && defined(ADAFRUIT_CC3000_H)
-bool MacroDuino::connectMQTT(Adafruit_CC3000& cc3000, Adafruit_CC3000_Client& client, cc3000_PubSubClient& mqttclient, char* MQTT_Username, char* MQTT_Password, uint32_t server) {
+bool ARO_MicrOS::connectMQTT(Adafruit_CC3000& cc3000, Adafruit_CC3000_Client& client, cc3000_PubSubClient& mqttclient, char* MQTT_Username, char* MQTT_Password, uint32_t server) {
   // connect to the broker
   if (!client.connected()) {
     client = cc3000.connectTCP(server, 1883);
@@ -1682,7 +1682,7 @@ bool MacroDuino::connectMQTT(Adafruit_CC3000& cc3000, Adafruit_CC3000_Client& cl
 #endif
 
 /*
-void MacroDuino::cc3000MQTTInterfaceCallback(char* topic, byte* payload, unsigned int length) {
+void ARO_MicrOS::cc3000MQTTInterfaceCallback(char* topic, byte* payload, unsigned int length) {
   char mqttReturnData[MQTT_MAX_PACKET_SIZE];
 
   char commandString[length+1];
@@ -1702,7 +1702,7 @@ void MacroDuino::cc3000MQTTInterfaceCallback(char* topic, byte* payload, unsigne
 }
 */
 
-void MacroDuino::serialInterface() {
+void ARO_MicrOS::serialInterface() {
   char serialCommandString[BUFFERSIZE];
   char serialReturnData[BUFFERSIZE];
 	memset(serialReturnData, 0, sizeof serialReturnData);
@@ -1728,7 +1728,7 @@ void MacroDuino::serialInterface() {
 }
 
 #if defined(cc3000_PubSubClient_h) && defined(ADAFRUIT_CC3000_H)
-void MacroDuino::publishCheckin() {	
+void ARO_MicrOS::publishCheckin() {	
   this->checkinCurrentMillis = millis();
   if ((this->checkinCurrentMillis - this->checkinPreviousMillis) >= 30000){
     this->checkinPreviousMillis = this->checkinCurrentMillis;     

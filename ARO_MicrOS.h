@@ -1,5 +1,5 @@
-#ifndef MACRODUINO_H
-#define MACRODUINO_H
+#ifndef ARO_MICROS_H
+#define ARO_MICROS_H
 
 #include <Arduino.h>
 #include <EEPROM.h>
@@ -18,7 +18,7 @@ extern	cc3000_PubSubClient mqttclient;
 extern char* MQTT_Username;
 extern char mqttString[160];
 
-class MacroDuino {
+class ARO_MicrOS {
 private:
 	#ifdef ADAFRUIT_CC3000_H
 	Adafruit_CC3000* _cc3000;
@@ -43,7 +43,7 @@ private:
 	unsigned long checkinPreviousMillis;	
 
 public:
-	MacroDuino();
+	ARO_MicrOS();
 
 	#ifdef ADAFRUIT_CC3000_H
 	uint16_t cc3000CheckFirmwareVersion(Adafruit_CC3000& cc3000);
