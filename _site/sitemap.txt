@@ -1,0 +1,8 @@
+
+http://bnc-shield.practicalmaker.com/atom.xml
+http://bnc-shield.practicalmaker.com/categories.html
+http://bnc-shield.practicalmaker.com/index.html
+http://bnc-shield.practicalmaker.com/pages.html
+http://bnc-shield.practicalmaker.com/rss.xml
+http://bnc-shield.practicalmaker.com/sitemap.txt
+http://bnc-shield.practicalmaker.com/tags.html

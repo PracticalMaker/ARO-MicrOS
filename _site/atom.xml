@@ -1,0 +1,16 @@
+<?xml version="1.0" encoding="utf-8"?>
+<feed xmlns="http://www.w3.org/2005/Atom">
+ 
+ <title>Arduarium Shield</title>
+ <link href="http://bnc-shield.practicalmaker.com/" rel="self"/>
+ <link href="http://bnc-shield.practicalmaker.com"/>
+ <updated>2014-08-04T12:04:38-04:00</updated>
+ <id>http://bnc-shield.practicalmaker.com</id>
+ <author>
+   <name>Andrew Oke</name>
+   <email>andrew@practicalmaker.com</email>
+ </author>
+
+ 
+ 
+</feed>
