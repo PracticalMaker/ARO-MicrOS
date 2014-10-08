@@ -5,5 +5,6 @@ tagline:
 ---
 {% include JB/setup %}
 
-{:.fullwideimage}
-![](https://s3.amazonaws.com/practicalmaker/Images/EC_Shield/EC_Shield_-_TOP.png)
+### Specific setup instructions
+1. [pH](/ph.html)
+2. [EC](/ec.html)
