@@ -6,7 +6,7 @@ ARO_MicrOS::ARO_MicrOS() {
 }
 
 void ARO_MicrOS::begin() {
-    #ifdef DEBUG
+	#if OUTPUT == SERIAL
     this->outputln("Begin");
     #endif
 	this->setDeviceAddress();
@@ -329,12 +329,13 @@ char *ARO_MicrOS::control(char *returnData, char *commandString) {
 		char *char_configuration_number = strtok(NULL, "/");
 		char *charpin = strtok(NULL, "/");
 		char *charvalue1 = strtok(NULL, "/");
-		char *charvalue2 = strtok(NULL, "/");	  	  
+		char *charvalue2 = strtok(NULL, "/");
+		char *chartype = strtok(NULL, "/");		
 
 		byte configuration_number = atoi(char_configuration_number);
 		byte pin = atoi(charpin);
 
-		return (char*)this->configureISE(configuration_number, pin, charvalue1, charvalue2);		
+		return (char*)this->configureISE(configuration_number, pin, charvalue1, charvalue2, chartype);		
 	}  
 	#endif
   
@@ -1384,12 +1385,13 @@ void ARO_MicrOS::setDeviceAddress() {
       this->_deviceID[j-1] = this->eepromRead(j);
 	  this->_deviceID[j] = '\0';
     }
-	#ifdef DEBUG
+	#if OUTPUT == SERIAL
 	Serial.print("Device ID: ");
 	Serial.println(this->_deviceID);
 	#endif   
   }
   #endif
+  
   #ifdef STM32F10X_MD
   String myID = Spark.deviceID();      
   char charmyID[40];
@@ -1486,24 +1488,45 @@ bool ARO_MicrOS::displayConnectionDetails(Adafruit_CC3000& cc3000)
 #endif
 
 #ifdef COMMAND_CONFIGUREISE_ENABLED
-bool ARO_MicrOS::configureISE(byte configuration_number, byte pin, char *value1, char *value2) {
+bool ARO_MicrOS::configureISE(byte configuration_number, byte pin, char *value1, char *value2, char *type) {
 	unsigned int address_start = CONFIGURATION_START + (CONFIGURATION_LENGTH * configuration_number);
 	unsigned int address_pointer = address_start;
 	
 	if((address_start + CONFIGURATION_LENGTH) > CONFIGURATION_END) {
-		this->outputln("Out of address space");
+		#if OUTPUT == SERIAL
+		Serial.println("Out of address space");
+		#endif
 		return false;
 	}
+
+	#if OUTPUT == SERIAL
+	Serial.print("Configuration number: ");
+	Serial.println(configuration_number);
+	Serial.print("Pin: ");
+	Serial.println(pin);
+	Serial.print("Value 1: ");
+	Serial.println(value1);
+	Serial.print("Value 2: ");
+	Serial.println(value2);			
+	Serial.print("Type: ");
+	Serial.println(type);				
+	#endif
 
 	byte matchCount;
 	unsigned long reading = 0;
 	int oldValue = 1;
 	int newValue = 0;	
 
-	this->eepromWrite(address_pointer, 2);	
+	this->eepromWrite(address_pointer, CONFIGURATION_TYPE_PH);	
 	address_pointer++;
 	this->eepromWrite(address_pointer, pin);	
 	address_pointer++;	
+	while(*type) {
+		this->eepromWrite(address_pointer, *type++);	
+		address_pointer++;
+	}	
+	this->eepromWrite(address_pointer, 255);
+	address_pointer++;		
 	while(*value1) {
 		this->eepromWrite(address_pointer, *value1++);	
 		address_pointer++;
@@ -1517,24 +1540,30 @@ bool ARO_MicrOS::configureISE(byte configuration_number, byte pin, char *value1,
 	this->eepromWrite(address_pointer, 255);
 	address_pointer++;		
 
+	#if OUTPUT == SERIAL
+	Serial.print("Configured match count: ");
+	Serial.println(ISE_CONFIGURE_MATCHCOUNT);
+	#endif
+
 	matchCount = 0;
 	reading = 0;
 	while(matchCount < ISE_CONFIGURE_MATCHCOUNT) {
 		oldValue = newValue;
 		reading = 0;
-		#ifdef DEBUG
-		Serial.println("Not stable, carrying on");
-		#endif
 		for(byte i=0; i<255; i++) {
 			reading = reading + analogRead(pin);
 			delay(1);
 		}
+		#if OUTPUT == SERIAL
+		Serial.print("Match count: ");
+		Serial.println(matchCount);
+		#endif		
 		newValue = reading/255;
 
 		if(newValue == oldValue) {
 			matchCount++;
 		}
-		#ifdef DEBUG
+		#if defined(DEBUG) && OUTPUT == SERIAL
 		Serial.print("Old value: ");
 		Serial.println(oldValue);
 		Serial.print("New value: ");
@@ -1552,19 +1581,20 @@ bool ARO_MicrOS::configureISE(byte configuration_number, byte pin, char *value1,
 	address_pointer++;
 	this->eepromWrite(address_pointer, 255); 
 
-	#ifdef DEBUG
-	Serial.println("Now configuring second solution");
+	#if OUTPUT == SERIAL
+	Serial.println("Now configuring second solution. Please place probe in second solution. Waiting 30 seconds.");
 	#endif
 	
-	delay(16000);
+	delay(30000);
 	
 	oldValue = 1;
 	newValue = 0;
 	while(matchCount < ISE_CONFIGURE_MATCHCOUNT) {
 		oldValue = newValue;
 		reading = 0;
-		#ifdef DEBUG
-		Serial.println("Not stable, carrying on");
+		#if OUTPUT == SERIAL
+		Serial.print("Match count: ");
+		Serial.println(matchCount);
 		#endif
 		for(byte i=0; i<255; i++) {
 			reading = reading + analogRead(pin);
@@ -1575,7 +1605,7 @@ bool ARO_MicrOS::configureISE(byte configuration_number, byte pin, char *value1,
 		if(newValue == oldValue) {
 			matchCount++;
 		}
-		#ifdef DEBUG
+		#if defined(DEBUG) && OUTPUT == SERIAL
 		Serial.print("Old value: ");
 		Serial.println(oldValue);
 		Serial.print("New value: ");
@@ -1592,6 +1622,10 @@ bool ARO_MicrOS::configureISE(byte configuration_number, byte pin, char *value1,
 	this->eepromWrite(address_pointer, this->highValue(newValue)); 
 	address_pointer++;
 	this->eepromWrite(address_pointer, 255);
+	
+	#if OUTPUT == SERIAL
+	Serial.println("Completed ISE configuration");
+	#endif	
 
 	return true;  
 }
@@ -1917,7 +1951,7 @@ void ARO_MicrOS::configureEC(byte configuration_num, byte enable_pin, byte read_
 	float calibration_solution_2 = atof(char_calibration_solution_2);	
 	
 	address_pointer = address_start;
-	this->eepromWrite(address_pointer, 1);
+	this->eepromWrite(address_pointer, CONFIGURATION_TYPE_EC);
 	address_pointer++;	
 	this->eepromWrite(address_pointer, enable_pin);
 	address_pointer++;	

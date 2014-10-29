@@ -1,4 +1,4 @@
-#define DEBUG
+//#define DEBUG
 
 // Which commands do you want enabled?
 #define COMMAND_IDENTIFY_ENABLED
@@ -67,4 +67,8 @@ byte celsius = 0;
 #define EC_SAMPLES 1000
 #define EC_MATCH_COUNT 20
 
-#define ISE_CONFIGURE_MATCHCOUNT 2
+#define ISE_CONFIGURE_MATCHCOUNT 25
+
+#define SERIAL 1
+#define CONFIGURATION_TYPE_EC 1
+#define CONFIGURATION_TYPE_PH 1
