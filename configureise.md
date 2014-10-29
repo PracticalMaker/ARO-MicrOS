@@ -12,6 +12,8 @@ The configureise command is used to configure ion specific electrodes (ISE). You
 
 ### Usage
 
+First, make sure you open the ARO_MicrOS_Serial example sketch.
+
 configureise/Configuration_Number/PIN/Value1/Value2/Type
 
 
@@ -24,6 +26,8 @@ configureise/Configuration_Number/PIN/Value1/Value2/Type
 **Value2**: Value of the second solution **Input as a decimal ie. 10.00 NOT 10**
 
 **Type**: Type of measurement (pH, ORP etc.)
+
+Once you've typed the command in (example in the picture below) it's simply a matter of following the on screen instructions.
 
 {:.fullwideimage}
 ![](https://s3.amazonaws.com/practicalmaker/Images/ARO_MicrOS/configureISE.png)
