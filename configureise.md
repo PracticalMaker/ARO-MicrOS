@@ -1,8 +1,8 @@
 ---
 layout: page
-title: pH 
+title: Command configureise 
 tagline: 
-group: navigation
+group: 
 ---
 {% include JB/setup %}
 
