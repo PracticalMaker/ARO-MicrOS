@@ -6,13 +6,14 @@ group:
 ---
 {% include JB/setup %}
 
-# Setting up pH 
+## Command configureise
 
-### Command configureise
+The configureise command is used to configure ion specific electrodes (ISE). You know these as pH, ORP, DO etc. probes. This command basically takes measurements of 2 different solutions and stores them in EEPROM. The readise command assembles the data and then calculates the value. Note that this currently does not support temperature compensation.
 
 ### Usage
 
 configureise/Configuration_Number/PIN/Value1/Value2/Type
+
 
 **Configuration_Number**: ARO_MicrOS stores configurations by number starting from 0. By default there is room for 2 configurations, but this can be changed. Please see ARO_MicrOS Configurations
 
