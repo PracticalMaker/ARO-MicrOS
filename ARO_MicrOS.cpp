@@ -5,6 +5,36 @@ ARO_MicrOS::ARO_MicrOS() {
 
 }
 
+void ARO_MicrOS::begin() {
+    #ifdef DEBUG
+    this->outputln("Begin");
+    #endif
+	this->setDeviceAddress();
+	
+	#ifdef _RTCLIB_H_
+	rtc.begin();
+	if (! rtc.isrunning()) {
+		#ifdef DEBUG
+		Serial.println("RTC is NOT running!");
+		#endif
+		// following line sets the RTC to the date & time this sketch was compiled
+		rtc.adjust(DateTime(__DATE__, __TIME__));
+	}
+	#endif
+	
+	#ifdef ADAFRUIT_CC3000_H
+	this->connectCC3000(cc3000, client, wlan_ssid, wlan_pass, wlan_security, false);
+	#endif
+	
+    #if defined(STM32F10X_MD) && defined(PubSubClient_h)
+    this->sparkConnectMQTT(MQTT_Username, MQTT_Password);
+    #endif
+    
+	#ifdef cc3000_PubSubClient_h
+	this->connectMQTT(cc3000, client, mqttclient, MQTT_Username, MQTT_Password, server.ip);
+	#endif
+}
+
 char *ARO_MicrOS::control(char *returnData, char *commandString) {
   /******* NOTES  
    * for control functions with an eeprom.write a delay before returning is needed otherwise no data is returned
@@ -23,7 +53,7 @@ char *ARO_MicrOS::control(char *returnData, char *commandString) {
   memset(returnData, 0, sizeof returnData);
   memset(itoa_buffer, 0, sizeof itoa_buffer);  
   
-  #ifdef DEBUG_SERIAL
+  #ifdef DEBUG
 	Serial.print("Command Token: ");
 	Serial.println(command);
   #endif
@@ -36,7 +66,7 @@ char *ARO_MicrOS::control(char *returnData, char *commandString) {
     counter = 0;
      
     for(byte j = ADDRESS_START+1; j < ADDRESS_END; j++) {
-      returnData[counter] = EEPROM.read(j);
+	  returnData[counter] = this->eepromRead(j);
       counter++;
     }    
     returnData[counter] = '\0';
@@ -57,7 +87,7 @@ char *ARO_MicrOS::control(char *returnData, char *commandString) {
     
     this->pinModeSet(pin, mode);
     
-    #ifdef DEBUG_SERIAL
+    #ifdef DEBUG
 		Serial.print("Pin Mode Pin: ");
 		Serial.println(pin);
 		Serial.print("Pin Mode: ");
@@ -66,11 +96,11 @@ char *ARO_MicrOS::control(char *returnData, char *commandString) {
     
     counter = 0;
 
-    if(charpin[0] != NULL) {
+    if(charpin[0] != 0) {
       returnData[counter] = charpin[0];
       counter++;
     }
-    if(charpin[1] != NULL) {
+    if(charpin[1] != 0) {
       returnData[counter] = charpin[1];
       counter++;
     }    
@@ -98,27 +128,27 @@ char *ARO_MicrOS::control(char *returnData, char *commandString) {
     counter = 0;
     check = false;	
 
-    if(charpin[0] != NULL) {
+    if(charpin[0] != 0) {
       returnData[counter] = charpin[0];
       counter++;
     }
-    if(charpin[1] != NULL) {
+    if(charpin[1] != 0) {
       returnData[counter] = charpin[1];
       counter++;
     }    
     returnData[counter] = '/';
     counter++;    
-    if(charpinstatus[0] != NULL) {
+    if(charpinstatus[0] != 0) {
       returnData[counter] = charpinstatus[0];
       counter++;
     }
-    if(charpinstatus[1] != NULL) {
+    if(charpinstatus[1] != 0) {
       returnData[counter] = charpinstatus[1];
       counter++;
     } else {
       check = true;
     }
-    if(charpinstatus[2] != NULL && check != true) {
+    if(charpinstatus[2] != 0 && check != true) {
       returnData[counter] = charpinstatus[2];
       counter++;
     }
@@ -170,7 +200,7 @@ char *ARO_MicrOS::control(char *returnData, char *commandString) {
     counter++;
     returnData[counter] = '/';
     counter++;
-    if(itoa_buffer[0] != NULL) {
+    if(itoa_buffer[0] != 0) {
       returnData[counter] = itoa_buffer[0]; 
       counter++;
     } else {
@@ -178,19 +208,19 @@ char *ARO_MicrOS::control(char *returnData, char *commandString) {
       counter++;
       check = true;
     }
-    if(itoa_buffer[1] != NULL && check != true) {
+    if(itoa_buffer[1] != 0 && check != true) {
       returnData[counter] = itoa_buffer[1]; 
       counter++;
     } else {
       check = true;
     }
-    if(itoa_buffer[2] != NULL && check != true) {
+    if(itoa_buffer[2] != 0 && check != true) {
       returnData[counter] = itoa_buffer[2]; 
       counter++;
     } else {
       check = true;
     }
-    if(itoa_buffer[3] != NULL && check != true) {
+    if(itoa_buffer[3] != 0 && check != true) {
       returnData[counter] = itoa_buffer[3]; 
       counter++;
     } 
@@ -214,11 +244,11 @@ char *ARO_MicrOS::control(char *returnData, char *commandString) {
     counter = 0;
     check = false;
 
-    if(char_watch_pin[0] != NULL) {
+    if(char_watch_pin[0] != 0) {
       returnData[counter] = char_watch_pin[0];
       counter++;
     }
-    if(char_watch_pin[1] != NULL) {
+    if(char_watch_pin[1] != 0) {
       returnData[counter] = char_watch_pin[1];
       counter++;
     } 
@@ -294,35 +324,31 @@ char *ARO_MicrOS::control(char *returnData, char *commandString) {
 	}
   #endif
   
-  #ifdef COMMAND_CONFIGUREISE_ENABLED
+	#ifdef COMMAND_CONFIGUREISE_ENABLED
 	if(command == "configureise"){
-	  char *charpin = strtok(NULL, "/");
-	  char *charvalue1 = strtok(NULL, "/");
-	  char *charvalue2 = strtok(NULL, "/");	  	  
+		char *char_configuration_number = strtok(NULL, "/");
+		char *charpin = strtok(NULL, "/");
+		char *charvalue1 = strtok(NULL, "/");
+		char *charvalue2 = strtok(NULL, "/");	  	  
 
-	  byte pin = atoi(charpin);
-	  byte value1 = atoi(charvalue1);	  
-	  byte value2 = atoi(charvalue2);
-	  
-	  return (char*)this->configureISE(pin, value1, value2);		
+		byte configuration_number = atoi(char_configuration_number);
+		byte pin = atoi(charpin);
+
+		return (char*)this->configureISE(configuration_number, pin, charvalue1, charvalue2);		
 	}  
-  #endif
+	#endif
   
 	#ifdef COMMAND_READISE_ENABLED  
 	if(command == "readise"){
-	  char *charpin = strtok(NULL, "/");
-	  byte pin = atoi(charpin);	  
-	  
-	  float reading;
-	  
-	  reading = this->readISE(pin);
-	  
-	  #ifdef DEBUG_SERIAL
-	  Serial.print("readise: ");
-	  Serial.println(reading);
-	  #endif
-		
-		return returnData;
+		char *charconfiguration_number = strtok(NULL, "/");
+		byte configuration_number = atoi(charconfiguration_number);	  
+
+		#ifdef DEBUG
+		Serial.print("readise: ");
+		//Serial.println(this->readISE(configuration_number));
+		#endif
+
+		this->readISE(configuration_number);
 	}  	
 	#endif
 
@@ -332,7 +358,7 @@ char *ARO_MicrOS::control(char *returnData, char *commandString) {
     int tlc_pin_num = atoi(strtok(NULL, "/"));
     int tlc_action = atoi(strtok(NULL, "/"));
     
-		#ifdef DEBUG_SERIAL
+		#ifdef DEBUG
 		Serial.print("tlc_pin_num ");
 		Serial.println(tlc_pin_num);
 		Serial.print("tlc_action ");
@@ -400,7 +426,7 @@ char *ARO_MicrOS::control(char *returnData, char *commandString) {
     boolean check_temp_sensor_num = false;
     boolean check_itoa_buffer = false;
 
-    if(chartemp_sensor_num[0] != NULL) {
+    if(chartemp_sensor_num[0] != 0) {
       returnData[counter] = chartemp_sensor_num[0];
       counter++;
     } 
@@ -409,13 +435,13 @@ char *ARO_MicrOS::control(char *returnData, char *commandString) {
       counter++;
       check_temp_sensor_num = true;
     }
-    if(chartemp_sensor_num[1] != NULL && check_temp_sensor_num != true) {
+    if(chartemp_sensor_num[1] != 0 && check_temp_sensor_num != true) {
       returnData[counter] = chartemp_sensor_num[1];
       counter++;
     }
     returnData[counter] = '/';
     counter++;
-    if(itoa_buffer[0] != NULL) {
+    if(itoa_buffer[0] != 0) {
       returnData[counter] = itoa_buffer[0];
       counter++;
     } 
@@ -424,28 +450,28 @@ char *ARO_MicrOS::control(char *returnData, char *commandString) {
       counter++;
       check_itoa_buffer = true;
     }
-    if(itoa_buffer[1] != NULL && check_itoa_buffer != true) {
+    if(itoa_buffer[1] != 0 && check_itoa_buffer != true) {
       returnData[counter] = itoa_buffer[1];
       counter++;
     } 
     else {
       check_itoa_buffer = true;
     }
-    if(itoa_buffer[2] != NULL && check_itoa_buffer != true) {
+    if(itoa_buffer[2] != 0 && check_itoa_buffer != true) {
       returnData[counter] = itoa_buffer[2];
       counter++;
     } 
     else {
       check_itoa_buffer = true;
     }
-    if(itoa_buffer[3] != NULL && check_itoa_buffer != true) {
+    if(itoa_buffer[3] != 0 && check_itoa_buffer != true) {
       returnData[counter] = itoa_buffer[3];
       counter++;
     } 
     else {
       check_itoa_buffer = true;
     }
-    if(itoa_buffer[4] != NULL && check_itoa_buffer != true) {
+    if(itoa_buffer[4] != 0 && check_itoa_buffer != true) {
       returnData[counter] = itoa_buffer[4];
       counter++;
     } 
@@ -464,7 +490,7 @@ char *ARO_MicrOS::control(char *returnData, char *commandString) {
     int temp_sensor_num = atoi(chartemp_sensor_num);
 
 		if((PUBLISH_ONEWIRE_TEMP_START + temp_sensor_num) <= PUBLISH_ONEWIRE_TEMP_END) {
-			EEPROM.write((PUBLISH_ONEWIRE_TEMP_START + temp_sensor_num), 1);
+			this->eepromWrite((PUBLISH_ONEWIRE_TEMP_START + temp_sensor_num), 1);
 		}
   }	
 	#endif
@@ -475,13 +501,43 @@ char *ARO_MicrOS::control(char *returnData, char *commandString) {
     int temp_sensor_num = atoi(chartemp_sensor_num);
 
 		if((PUBLISH_ONEWIRE_TEMP_START + temp_sensor_num) <= PUBLISH_ONEWIRE_TEMP_END) {
-			EEPROM.write((PUBLISH_ONEWIRE_TEMP_START + temp_sensor_num), 0);
+			this->eepromWrite((PUBLISH_ONEWIRE_TEMP_START + temp_sensor_num), 0);
 		}
   }	
 	#endif
 	
+	#ifdef COMMAND_EC_CONFIGURE
+	if(command == "configure_ec"){
+		char *char_configuration_num = strtok(NULL, "/");	
+		char *char_enable_pin = strtok(NULL, "/");
+		char *char_read_pin = strtok(NULL, "/");		
+		//ppm, ec, salinity
+		char *char_calibration_units = strtok(NULL, "/");
+		// uS, SG
+		char *char_calibration_scale = strtok(NULL, "/");	
+		char *char_calibration_solution_1 = strtok(NULL, "/");
+		char *char_calibration_solution_2 = strtok(NULL, "/");	
+	
+		byte configuration_num = atoi(char_configuration_num);
+		byte enable_pin = atoi(char_enable_pin);
+		byte read_pin = atoi(char_read_pin);				
+	
+		this->configureEC(configuration_num, enable_pin, read_pin, char_calibration_units, char_calibration_scale, char_calibration_solution_1, char_calibration_solution_2); 
+	
+	}
+	#endif
+	#ifdef COMMAND_READ_EC
+	if(command == "readec"){
+		char *char_configuration_num = strtok(NULL, "/");	
 
-#ifdef PHENABLED
+		byte configuration_num = atoi(char_configuration_num);
+	
+		this->readEC(configuration_num); 
+	}
+	#endif	
+	
+
+  #ifdef PHENABLED
   if(commandToken == 28){
     char *char_watch_pin = strtok(NULL, "/");
     int watch_pin = atoi(char_watch_pin);
@@ -493,7 +549,7 @@ char *ARO_MicrOS::control(char *returnData, char *commandString) {
 
     return pHChar;
   }
-#endif
+  #endif
 
 #ifdef MACROSENABLED
   if(commandToken == 31) {
@@ -574,8 +630,7 @@ char *ARO_MicrOS::control(char *returnData, char *commandString) {
       counter++;
       for(int i=0; i<macros_bytes; i++) {
         int address = address_start + i;
-        int eeprom_value = EEPROM.read(address);
-
+		    int eeprom_value = this->eepromRead(address);
         if(i < 15) {
           char itoa_buffer[5];
           itoa(eeprom_value, itoa_buffer, 10);
@@ -632,7 +687,7 @@ char *ARO_MicrOS::control(char *returnData, char *commandString) {
 
     int address = macros_memstart + (macros_bytes * macro_number);
 
-    EEPROM.write(address, 0);
+		this->eepromWrite(address, 0);
 
     int counter = 0;
 
@@ -713,7 +768,7 @@ char *ARO_MicrOS::control(char *returnData, char *commandString) {
   }
 #endif
 
-  #ifdef PCF8574AENABLED && TwoWire_h
+  #if defined(PCF8574AENABLED) && defined(TwoWire_h)
   if(commandToken == 6) {
     byte device = atoi(strtok(NULL, "/"));
     byte pin = atoi(strtok(NULL, "/"));
@@ -768,19 +823,23 @@ char *ARO_MicrOS::control(char *returnData, char *commandString) {
   #endif
 
   memset(commandString, 0, sizeof commandString);  	  
-   
+  return returnData;
 }
 
 float c2f(float cel) {
   return (cel * (9.0/5.0)) + (float)3200;
 }
 
-int ARO_MicrOS::highValue(int value) {
-  return value / 256;
+int ARO_MicrOS::highValue(unsigned int value) {
+	if(value > 256) {
+		return value / 256;
+	} else {
+		return 0;
+	}
 }
 
-int ARO_MicrOS::lowValue(int value) {
-  return value % 256; 
+int ARO_MicrOS::lowValue(unsigned  value) {
+	return value % 256; 
 }
 
 int ARO_MicrOS::combineValue(unsigned int lb, unsigned int hb) {
@@ -790,15 +849,22 @@ int ARO_MicrOS::combineValue(unsigned int lb, unsigned int hb) {
 
 void ARO_MicrOS::resetMacros(){
   for(int i = MACROS_START; i <= MACROS_END; i++){
-    EEPROM.write(i, 0);
+		this->eepromWrite(i, 0);
   }
 }
 
 void ARO_MicrOS::pinModeSet(byte pin, byte mode) {
-  if((DIGITAL_PIN_START + pin) <= DIGITAL_PIN_END) {
-    EEPROM.write(DIGITAL_PIN_START+pin, mode);
-    pinMode(pin, mode);
-  }
+	this->eepromWrite(DIGITAL_PIN_START+pin, mode);
+	#if defined(ARDUINO) && ARDUINO >= 100
+	pinMode(pin, mode);
+	#endif
+	#ifdef STM32F10X_MD
+	if(mode == 0) {
+		pinMode(pin, INPUT);
+	} else if(mode == 1) {
+		pinMode(pin, OUTPUT);
+	}
+	#endif
 }
 
 void ARO_MicrOS::setPinStatus(byte pin, byte pinstatus) {
@@ -810,7 +876,7 @@ void ARO_MicrOS::setPinStatus(byte pin, byte pinstatus) {
   }
 }
 
-#ifdef PCF8574AENABLED && TwoWire_h
+#if defined(PCF8574AENABLED) && defined(TwoWire_h)
 void controlPCF8574A(byte device, byte pin_status, byte pin) {
   if(pin_status == 0) {
     pcf8574a_states[device] |= (1 << pin);
@@ -835,7 +901,12 @@ void macroSet(char *macro_name,  int arg1, int arg2, int arg3, int arg4, int arg
   int arg14;
   int memstart;
   for(int i=0; i<((MACROS_END - MACROS_START)/MACRO_BYTE_LENGTH); i++) {
-    if(EEPROM.read((MACROS_START + (i * MACRO_BYTE_LENGTH))) == 0) {
+	#if defined(ARDUINO) && ARDUINO >= 100
+	if(this->eepromRead((MACROS_START + (i * MACRO_BYTE_LENGTH))) == 0) {
+    #endif
+	#ifdef STM32F10X_MD
+	if(I2_this->eepromRead((MACROS_START + (i * MACRO_BYTE_LENGTH))) == 0) {
+	#endif            
       memstart = MACROS_START + (i * MACRO_BYTE_LENGTH);
       break;
     }
@@ -874,31 +945,31 @@ void macroSet(char *macro_name,  int arg1, int arg2, int arg3, int arg4, int arg
     arg8 = lowValue(arg8);
   }    
 
-  EEPROM.write(memstart, 1);
-  EEPROM.write(memstart + 1, arg1);  
-  EEPROM.write(memstart + 2, arg2);
-  EEPROM.write(memstart + 3, arg3);
-  EEPROM.write(memstart + 4, arg4);
-  EEPROM.write(memstart + 5, arg5);
-  EEPROM.write(memstart + 6, arg6);
-  EEPROM.write(memstart + 7, arg7);
-  EEPROM.write(memstart + 8, arg8);
-  EEPROM.write(memstart + 9, arg9);
-  EEPROM.write(memstart + 10, arg10);
-  EEPROM.write(memstart + 11, arg11);
-  EEPROM.write(memstart + 12, arg12);
-  EEPROM.write(memstart + 13, arg13);
-  EEPROM.write(memstart + 14, arg14);  
+  this->eepromWrite(memstart, 1);
+  this->eepromWrite(memstart + 1, arg1);  
+  this->eepromWrite(memstart + 2, arg2);
+  this->eepromWrite(memstart + 3, arg3);
+  this->eepromWrite(memstart + 4, arg4);
+  this->eepromWrite(memstart + 5, arg5);
+  this->eepromWrite(memstart + 6, arg6);
+  this->eepromWrite(memstart + 7, arg7);
+  this->eepromWrite(memstart + 8, arg8);
+  this->eepromWrite(memstart + 9, arg9);
+  this->eepromWrite(memstart + 10, arg10);
+  this->eepromWrite(memstart + 11, arg11);
+  this->eepromWrite(memstart + 12, arg12);
+  this->eepromWrite(memstart + 13, arg13);
+  this->eepromWrite(memstart + 14, arg14);  
 
   int counter = 0;
   boolean check = false;
   for(int i=15; i<= 19; i++) {
     if(macro_name[counter] != NULL && check != true) {
-      EEPROM.write(memstart + i, macro_name[counter]);
+      this->eepromWrite(memstart + i, macro_name[counter]);
       counter++;
     } 
     else if(macro_name[counter] == NULL && check == false) {
-      EEPROM.write(memstart + i, 0);      
+      this->eepromWrite(memstart + i, 0);      
       check = true;
     }
   } 
@@ -907,19 +978,19 @@ void macroSet(char *macro_name,  int arg1, int arg2, int arg3, int arg4, int arg
 
 #ifdef DIGITALPINSENABLED
 void runDigitalMacro(unsigned int mem_address){
-  if(digitalRead(EEPROM.read(mem_address + 2)) == EEPROM.read(mem_address + 3)) {
-    if(EEPROM.read(mem_address + 5) <= 1) {
-      if(EEPROM.read(mem_address + 4) <= 13) {  
-        digitalWrite(EEPROM.read(mem_address + 4), EEPROM.read(mem_address + 5));
+  if(digitalRead(this->eepromRead(mem_address + 2)) == this->eepromRead(mem_address + 3)) {
+    if(this->eepromRead(mem_address + 5) <= 1) {
+      if(this->eepromRead(mem_address + 4) <= 13) {  
+        digitalWrite(this->eepromRead(mem_address + 4), this->eepromRead(mem_address + 5));
       } 
-      else if(EEPROM.read(mem_address + 4) == 254) { //pcf8574
+      else if(this->eepromRead(mem_address + 4) == 254) { //pcf8574
         #ifdef PCF8574AENABLED && TwoWire_h
-          controlPCF8574A(EEPROM.read(mem_address + 6), EEPROM.read(mem_address + 5), EEPROM.read(mem_address + 7));
+          controlPCF8574A(this->eepromRead(mem_address + 6), this->eepromRead(mem_address + 5), this->eepromRead(mem_address + 7));
         #endif        
       }
     }
     else{
-      analogWrite(EEPROM.read(mem_address + 4), EEPROM.read(mem_address + 5));		
+      analogWrite(this->eepromRead(mem_address + 4), this->eepromRead(mem_address + 5));		
     }
   }
 }
@@ -927,54 +998,54 @@ void runDigitalMacro(unsigned int mem_address){
 
 #ifdef ANALOGENABLED
 void runAnalogMacro(unsigned int mem_address){
-  if(EEPROM.read(mem_address + 4) == 1) {
-    if(analogRead(EEPROM.read(mem_address + 2)) < combineValue(EEPROM.read(mem_address + 3), EEPROM.read(mem_address + 14))) {
-      if(EEPROM.read(mem_address + 6) <= 1) {
-        if(EEPROM.read(mem_address + 5) <= 13) {
-          digitalWrite(EEPROM.read(mem_address + 5), EEPROM.read(mem_address + 6));
+  if(this->eepromRead(mem_address + 4) == 1) {
+    if(analogRead(this->eepromRead(mem_address + 2)) < combineValue(this->eepromRead(mem_address + 3), this->eepromRead(mem_address + 14))) {
+      if(this->eepromRead(mem_address + 6) <= 1) {
+        if(this->eepromRead(mem_address + 5) <= 13) {
+          digitalWrite(this->eepromRead(mem_address + 5), this->eepromRead(mem_address + 6));
         }
-        else if(EEPROM.read(mem_address + 5) == 254) { //pcf8574
+        else if(this->eepromRead(mem_address + 5) == 254) { //pcf8574
           #ifdef PCF8574AENABLED && TwoWire_h
-            controlPCF8574A(EEPROM.read(mem_address + 7), EEPROM.read(mem_address + 6), EEPROM.read(mem_address + 8));
+            controlPCF8574A(this->eepromRead(mem_address + 7), this->eepromRead(mem_address + 6), this->eepromRead(mem_address + 8));
           #endif          
         }
       }
-      else if(EEPROM.read(mem_address + 6) > 1) {
-        analogWrite(EEPROM.read(mem_address + 5), EEPROM.read(mem_address + 6));
+      else if(this->eepromRead(mem_address + 6) > 1) {
+        analogWrite(this->eepromRead(mem_address + 5), this->eepromRead(mem_address + 6));
       }
     }
   }
-  else if(EEPROM.read(mem_address + 4) == 2) {
-    if(analogRead(EEPROM.read(mem_address + 2)) > combineValue(EEPROM.read(mem_address + 3), EEPROM.read(mem_address + 14))) {
-      if(EEPROM.read(mem_address + 6) <= 1) {
-        if(EEPROM.read(mem_address + 5) <= 13) {
-          digitalWrite(EEPROM.read(mem_address + 5), EEPROM.read(mem_address + 6));
+  else if(this->eepromRead(mem_address + 4) == 2) {
+    if(analogRead(this->eepromRead(mem_address + 2)) > combineValue(this->eepromRead(mem_address + 3), this->eepromRead(mem_address + 14))) {
+      if(this->eepromRead(mem_address + 6) <= 1) {
+        if(this->eepromRead(mem_address + 5) <= 13) {
+          digitalWrite(this->eepromRead(mem_address + 5), this->eepromRead(mem_address + 6));
         }
-        else if(EEPROM.read(mem_address + 5) == 254) { //pcf8574
+        else if(this->eepromRead(mem_address + 5) == 254) { //pcf8574
           #ifdef PCF8574AENABLED && TwoWire_h
-            controlPCF8574A(EEPROM.read(mem_address + 7), EEPROM.read(mem_address + 6), EEPROM.read(mem_address + 8));
+            controlPCF8574A(this->eepromRead(mem_address + 7), this->eepromRead(mem_address + 6), this->eepromRead(mem_address + 8));
           #endif          
         }
       }
-      else if(EEPROM.read(mem_address + 6) > 1) {
-        analogWrite(EEPROM.read(mem_address + 5), EEPROM.read(mem_address + 6));
+      else if(this->eepromRead(mem_address + 6) > 1) {
+        analogWrite(this->eepromRead(mem_address + 5), this->eepromRead(mem_address + 6));
       }
     }	
   }
-  else if(EEPROM.read(mem_address + 4) == 3) {
-    if(analogRead(EEPROM.read(mem_address + 2)) == combineValue(EEPROM.read(mem_address + 3), EEPROM.read(mem_address + 14))) {
-      if(EEPROM.read(mem_address + 6) <= 1) {
-        if(EEPROM.read(mem_address + 5) <= 13) {
-          digitalWrite(EEPROM.read(mem_address + 5), EEPROM.read(mem_address + 6));
+  else if(this->eepromRead(mem_address + 4) == 3) {
+    if(analogRead(this->eepromRead(mem_address + 2)) == combineValue(this->eepromRead(mem_address + 3), this->eepromRead(mem_address + 14))) {
+      if(this->eepromRead(mem_address + 6) <= 1) {
+        if(this->eepromRead(mem_address + 5) <= 13) {
+          digitalWrite(this->eepromRead(mem_address + 5), this->eepromRead(mem_address + 6));
         }
-        else if(EEPROM.read(mem_address + 5) == 254) { //pcf8574
+        else if(this->eepromRead(mem_address + 5) == 254) { //pcf8574
           #ifdef PCF8574AENABLED && TwoWire_h
-            controlPCF8574A(EEPROM.read(mem_address + 7), EEPROM.read(mem_address + 6), EEPROM.read(mem_address + 8));
+            controlPCF8574A(this->eepromRead(mem_address + 7), this->eepromRead(mem_address + 6), this->eepromRead(mem_address + 8));
           #endif          
         }
       }
-      else if(EEPROM.read(mem_address + 6) > 1) {
-        analogWrite(EEPROM.read(mem_address + 5), EEPROM.read(mem_address + 6));
+      else if(this->eepromRead(mem_address + 6) > 1) {
+        analogWrite(this->eepromRead(mem_address + 5), this->eepromRead(mem_address + 6));
       }
     }
   }
@@ -997,49 +1068,49 @@ void runDS1307Macro(unsigned int mem_address){
   long rtc_time;		
 
   rtc_time = (RTC.get(DS1307_HR,true) * 60 * 60) + (RTC.get(DS1307_MIN,true) * 60);
-  time_start = (EEPROM.read(mem_address + 2) * 60 * 60) + (EEPROM.read(mem_address + 3) * 60);
-  time_stop = (EEPROM.read(mem_address + 4) * 60 * 60) + (EEPROM.read(mem_address + 5) * 60);
+  time_start = (this->eepromRead(mem_address + 2) * 60 * 60) + (this->eepromRead(mem_address + 3) * 60);
+  time_stop = (this->eepromRead(mem_address + 4) * 60 * 60) + (this->eepromRead(mem_address + 5) * 60);
 
-  if(RTC.get(DS1307_DOW, false) == EEPROM.read(mem_address + 6) || EEPROM.read(mem_address + 6) == 0) {	
+  if(RTC.get(DS1307_DOW, false) == this->eepromRead(mem_address + 6) || this->eepromRead(mem_address + 6) == 0) {	
     if(rtc_time >= time_start && rtc_time <= time_stop) {
-      if(EEPROM.read(mem_address + 8) <= 1) {
-        if(EEPROM.read(mem_address + 7) <= 13) {
-          digitalWrite(EEPROM.read(mem_address + 7), EEPROM.read(mem_address + 8));
-        } else if(EEPROM.read(mem_address + 7) == 254) { //pcf8574
+      if(this->eepromRead(mem_address + 8) <= 1) {
+        if(this->eepromRead(mem_address + 7) <= 13) {
+          digitalWrite(this->eepromRead(mem_address + 7), this->eepromRead(mem_address + 8));
+        } else if(this->eepromRead(mem_address + 7) == 254) { //pcf8574
           #ifdef PCF8574AENABLED
-            controlPCF8574A(EEPROM.read(mem_address + 10), EEPROM.read(mem_address + 8), EEPROM.read(mem_address + 11));
+            controlPCF8574A(this->eepromRead(mem_address + 10), this->eepromRead(mem_address + 8), this->eepromRead(mem_address + 11));
           #endif
         }
       } else {
-        if(rtc_time < (time_start + EEPROM.read(mem_address + 9))) { //fade in
-          if(EEPROM.read(mem_address + 7) <= 13) {
-            int pwm_value = (rtc_time - time_start) * (EEPROM.read(mem_address + 8) / EEPROM.read(mem_address + 9));
-            #ifdef DEBUG_SERIAL
+        if(rtc_time < (time_start + this->eepromRead(mem_address + 9))) { //fade in
+          if(this->eepromRead(mem_address + 7) <= 13) {
+            int pwm_value = (rtc_time - time_start) * (this->eepromRead(mem_address + 8) / this->eepromRead(mem_address + 9));
+            #ifdef DEBUG
 						Serial.print("PWM Fade In: ");
 						Serial.println(pwm_value);
             #endif
-            analogWrite(EEPROM.read(mem_address + 7), pwm_value);
+            analogWrite(this->eepromRead(mem_address + 7), pwm_value);
           }
-        } else if(rtc_time > (time_stop - EEPROM.read(mem_address + 9))) { //fade out
-          int pwm_value = (time_stop - rtc_time) * (EEPROM.read(mem_address + 8) / EEPROM.read(mem_address + 9));
-          #ifdef DEBUG_SERIAL
+        } else if(rtc_time > (time_stop - this->eepromRead(mem_address + 9))) { //fade out
+          int pwm_value = (time_stop - rtc_time) * (this->eepromRead(mem_address + 8) / this->eepromRead(mem_address + 9));
+          #ifdef DEBUG
 					Serial.print("PWM Fade Out: ");        
 					Serial.println(pwm_value);
           #endif        
-          analogWrite(EEPROM.read(mem_address + 7), pwm_value);
+          analogWrite(this->eepromRead(mem_address + 7), pwm_value);
         } else {
-          #ifdef DEBUG_SERIAL
+          #ifdef DEBUG
 					Serial.print("PWM On at: ");
-					Serial.println(EEPROM.read(mem_address + 8));
+					Serial.println(this->eepromRead(mem_address + 8));
           #endif
-          analogWrite(EEPROM.read(mem_address + 7), EEPROM.read(mem_address + 8));
+          analogWrite(this->eepromRead(mem_address + 7), this->eepromRead(mem_address + 8));
         }
 
       }
     } else if(rtc_time > time_stop) {
-      digitalWrite(EEPROM.read(mem_address + 7), 0);
+      digitalWrite(this->eepromRead(mem_address + 7), 0);
       #ifdef PCF8574AENABLED
-        controlPCF8574A(EEPROM.read(mem_address + 10), 0, EEPROM.read(mem_address + 11));    
+        controlPCF8574A(this->eepromRead(mem_address + 10), 0, this->eepromRead(mem_address + 11));    
       #endif
     }
   }
@@ -1061,12 +1132,12 @@ int ARO_MicrOS::discoverOneWireDevices() {
     e = ONEWIRE_ADDRESSES_START + (d * ONEWIRE_ADDRESSES_BYTES);
     
     for( i = 0; i < 8; i++) {
-      EEPROM.write((e + i), addr[i]);
-      #ifdef DEBUG_SERIAL
+      this->eepromWrite((e + i), addr[i]);
+      #ifdef DEBUG
       Serial.print(addr[i], HEX);
       #endif
     }
-    #ifdef DEBUG_SERIAL
+    #ifdef DEBUG
     Serial.println();
     #endif
 
@@ -1075,7 +1146,7 @@ int ARO_MicrOS::discoverOneWireDevices() {
     }
     d++;
   }
-  EEPROM.write(NUM_ONEWIRE_DEVICES, d);
+  this->eepromWrite(NUM_ONEWIRE_DEVICES, d);
 
   ds.reset_search();
   return d;
@@ -1093,17 +1164,17 @@ int ARO_MicrOS::getDS18B20Temp(int device_num) {
   int HighByte, LowByte, TReading, SignBit, Tc_100, Whole, Fract;
 
   for(i = 0; i < 8; i++){
-    addr[i] = EEPROM.read((ONEWIRE_ADDRESSES_START + (ONEWIRE_ADDRESSES_BYTES * device_num) + i)); 
+    addr[i] = this->eepromRead((ONEWIRE_ADDRESSES_START + (ONEWIRE_ADDRESSES_BYTES * device_num) + i)); 
   }
 
-	#ifdef DEBUG_SERIAL
+	#ifdef DEBUG
 	if ( OneWire::crc8( addr, 7) != addr[7]) {
 		Serial.print("CRC is not valid!\n");
 	}
 	#endif
 
   if ( addr[0] != 0x28) {
-		#ifdef DEBUG_SERIAL
+		#ifdef DEBUG
     Serial.print("Device is not a DS18S20 family device.\n");
     #endif
   }
@@ -1160,60 +1231,60 @@ int getORPValue(unsigned int pin) {
 }
 #endif
 
-#ifdef OneWire_hh && EEPROM_h 
-void runDS18B20Macro(int mem_address) {
+#if defined(OneWire_h) && defined(EEPROM_h)
+void ARO_MicrOS::runDS18B20Macro(int mem_address) {
   int temp;
 
-  temp = getDS18B20Temp(EEPROM.read(mem_address + 2));
+  temp = this->getDS18B20Temp(this->eepromRead(mem_address + 2));
 
-  if(EEPROM.read(mem_address + 3) == 1) {
-    if(temp < ((EEPROM.read(mem_address + 4) * 100) + EEPROM.read(mem_address + 5))) {
-      if(EEPROM.read(mem_address + 7) <= 1) {
-        if(EEPROM.read(mem_address + 6) <= 13) {
-          digitalWrite(EEPROM.read(mem_address + 6), EEPROM.read(mem_address + 7));
+  if(this->eepromRead(mem_address + 3) == 1) {
+    if(temp < ((this->eepromRead(mem_address + 4) * 100) + this->eepromRead(mem_address + 5))) {
+      if(this->eepromRead(mem_address + 7) <= 1) {
+        if(this->eepromRead(mem_address + 6) <= 13) {
+          digitalWrite(this->eepromRead(mem_address + 6), this->eepromRead(mem_address + 7));
         }
-        else if(EEPROM.read(mem_address + 6) == 254) { //pcf8574
-          #ifdef PCF8574AENABLED && TwoWire_h
-            controlPCF8574A(EEPROM.read(mem_address + 8), EEPROM.read(mem_address + 7), EEPROM.read(mem_address + 9));
+        else if(this->eepromRead(mem_address + 6) == 254) { //pcf8574
+          #if defined(PCF8574AENABLED) && defined(TwoWire_h)
+            controlPCF8574A(this->eepromRead(mem_address + 8), this->eepromRead(mem_address + 7), this->eepromRead(mem_address + 9));
           #endif
         }
       } 
       else {
-        analogWrite(EEPROM.read(mem_address + 6), EEPROM.read(mem_address + 7));			
+        analogWrite(this->eepromRead(mem_address + 6), this->eepromRead(mem_address + 7));			
       }
     }
   } 
-  else if(EEPROM.read(mem_address + 3) == 2) {
-    if(temp > ((EEPROM.read(mem_address + 4) * 100) + EEPROM.read(mem_address + 5))) {
-      if(EEPROM.read(mem_address + 7) <= 1) {
-        if(EEPROM.read(mem_address + 6) <= 13) {
-          digitalWrite(EEPROM.read(mem_address + 6), EEPROM.read(mem_address + 7));
+  else if(this->eepromRead(mem_address + 3) == 2) {
+    if(temp > ((this->eepromRead(mem_address + 4) * 100) + this->eepromRead(mem_address + 5))) {
+      if(this->eepromRead(mem_address + 7) <= 1) {
+        if(this->eepromRead(mem_address + 6) <= 13) {
+          digitalWrite(this->eepromRead(mem_address + 6), this->eepromRead(mem_address + 7));
         }
-        else if(EEPROM.read(mem_address + 6) == 254) { //pcf8574
-          #ifdef PCF8574AENABLED && TwoWire_h
-            controlPCF8574A(EEPROM.read(mem_address + 8), EEPROM.read(mem_address + 7), EEPROM.read(mem_address + 9));
+        else if(this->eepromRead(mem_address + 6) == 254) { //pcf8574
+          #if defined(PCF8574AENABLED) && defined(TwoWire_h)
+            controlPCF8574A(this->eepromRead(mem_address + 8), this->eepromRead(mem_address + 7), this->eepromRead(mem_address + 9));
           #endif
         }
       } 
       else {
-        analogWrite(EEPROM.read(mem_address + 6), EEPROM.read(mem_address + 7));			
+        analogWrite(this->eepromRead(mem_address + 6), this->eepromRead(mem_address + 7));			
       }
     }	
   } 
-  else if(EEPROM.read(mem_address + 3) == 3) {
-    if(temp == ((EEPROM.read(mem_address + 4) * 100) + EEPROM.read(mem_address + 5))) {
-      if(EEPROM.read(mem_address + 7) <= 1) {
-        if(EEPROM.read(mem_address + 6) <= 13) {
-          digitalWrite(EEPROM.read(mem_address + 6), EEPROM.read(mem_address + 7));
+  else if(this->eepromRead(mem_address + 3) == 3) {
+    if(temp == ((this->eepromRead(mem_address + 4) * 100) + this->eepromRead(mem_address + 5))) {
+      if(this->eepromRead(mem_address + 7) <= 1) {
+        if(this->eepromRead(mem_address + 6) <= 13) {
+          digitalWrite(this->eepromRead(mem_address + 6), this->eepromRead(mem_address + 7));
         }
-        else if(EEPROM.read(mem_address + 6) == 254) { //pcf8574
-          #ifdef PCF8574AENABLED && TwoWire_h
-            controlPCF8574A(EEPROM.read(mem_address + 8), EEPROM.read(mem_address + 7), EEPROM.read(mem_address + 9));
+        else if(this->eepromRead(mem_address + 6) == 254) { //pcf8574
+          #if defined(PCF8574AENABLED) && defined(TwoWire_h)
+            controlPCF8574A(this->eepromRead(mem_address + 8), this->eepromRead(mem_address + 7), this->eepromRead(mem_address + 9));
           #endif
         }
       } 
       else {
-        analogWrite(EEPROM.read(mem_address + 6), EEPROM.read(mem_address + 7));			
+        analogWrite(this->eepromRead(mem_address + 6), this->eepromRead(mem_address + 7));			
       }
     }	
   }
@@ -1229,9 +1300,9 @@ void controlTLC5940(int tlc_pin_num, int tlc_action) {
 #endif
 
 void ARO_MicrOS::runMacros() {
-	#ifdef cc3000_PubSubClient_h
+	#if defined(cc3000_PubSubClient_h) && defined(OneWire_h)
 	for(int j = PUBLISH_ONEWIRE_TEMP_START; j <= PUBLISH_ONEWIRE_TEMP_END; j++) {
-		if(EEPROM.read(j) == 1) {		
+		if(this->eepromRead(j) == 1) {		
 			if(mqttclient.connected()) {
 				char chartemp[10];
 				//PUBLISH_ONEWIRE_TEMP_END + j
@@ -1256,23 +1327,23 @@ void ARO_MicrOS::runMacros() {
 /*  int macro_mem_address_start;
   for(unsigned int i = 0; i < ((MACROS_END - MACROS_START) / MACRO_BYTE_LENGTH); i++) {
     macro_mem_address_start = MACROS_START + (i * MACRO_BYTE_LENGTH);
-    if(EEPROM.read(macro_mem_address_start) == 1) {    
-      if(EEPROM.read(macro_mem_address_start + 1) == 1) {
+    if(this->eepromRead(macro_mem_address_start) == 1) {    
+      if(this->eepromRead(macro_mem_address_start + 1) == 1) {
         #ifdef DIGITALPINSENABLED
           runDigitalMacro(macro_mem_address_start);
         #endif
       }
-      else if(EEPROM.read(macro_mem_address_start + 1) == 2) {
+      else if(this->eepromRead(macro_mem_address_start + 1) == 2) {
         #ifdef ANALOGENABLED
           runAnalogMacro(macro_mem_address_start);
         #endif  
       }
-      else if(EEPROM.read(macro_mem_address_start + 1) == 3) {
+      else if(this->eepromRead(macro_mem_address_start + 1) == 3) {
 #ifdef DS1307_h
         runDS1307Macro(macro_mem_address_start);
 #endif
       }
-      else if(EEPROM.read(macro_mem_address_start + 1) == 4) {
+      else if(this->eepromRead(macro_mem_address_start + 1) == 4) {
         #ifdef OneWire_hh && DS18B20ENABLED
           runDS18B20Macro(macro_mem_address_start);
         #endif
@@ -1280,37 +1351,6 @@ void ARO_MicrOS::runMacros() {
     }
   }*/
 }
-
-/**************************************************************************/
-/*!
-    @brief  Tries to read the IP address and other connection details
-*/
-/**************************************************************************/
-#ifdef ADAFRUIT_CC3000_H
-bool ARO_MicrOS::displayConnectionDetails(Adafruit_CC3000& cc3000) {
-  uint32_t ipAddress, netmask, gateway, dhcpserv, dnsserv;
-  
-  if(!cc3000.getIPAddress(&ipAddress, &netmask, &gateway, &dhcpserv, &dnsserv))
-  {
-  	#ifdef DEBUG_SERIAL
-    Serial.println(F("Unable to retrieve the IP Address!\r\n"));
-    #endif
-    return false;
-  }
-  else
-  {
-  	#ifdef DEBUG_SERIAL
-    Serial.print(F("\nIP Addr: ")); cc3000.printIPdotsRev(ipAddress);
-    Serial.print(F("\nNetmask: ")); cc3000.printIPdotsRev(netmask);
-    Serial.print(F("\nGateway: ")); cc3000.printIPdotsRev(gateway);
-    Serial.print(F("\nDHCPsrv: ")); cc3000.printIPdotsRev(dhcpserv);
-    Serial.print(F("\nDNSserv: ")); cc3000.printIPdotsRev(dnsserv);
-    Serial.println();
-    #endif
-    return true;
-  }
-}
-#endif
 
 /**************************************************************************/
 /*!
@@ -1332,30 +1372,57 @@ bool ARO_MicrOS::displayConnectionDetails(Adafruit_CC3000& cc3000) {
   }
 }*/
 
-#ifdef EEPROM_h
 void ARO_MicrOS::setDeviceAddress() {
-  if(EEPROM.read(ADDRESS_START) != 253) {
-    EEPROM.write(ADDRESS_START, 253); 
+  #if defined(ARDUINO) && ARDUINO >= 100
+  if(this->eepromRead(ADDRESS_START) != 253) {
+    this->eepromWrite(ADDRESS_START, 253); 
     for(byte j = ADDRESS_START+1; j < ADDRESS_END; j++) {
-      EEPROM.write(j, random(65, 90));  
+      this->eepromWrite(j, random(65, 90));  
     }
-  } 
-  else {
+  } else {
     for(byte j = ADDRESS_START+1; j < ADDRESS_END; j++) {
-      this->_deviceID[j-1] = EEPROM.read(j);
+      this->_deviceID[j-1] = this->eepromRead(j);
 	  this->_deviceID[j] = '\0';
     }
-	#ifdef DEBUG_SERIAL
+	#ifdef DEBUG
 	Serial.print("Device ID: ");
 	Serial.println(this->_deviceID);
 	#endif   
   }
+  #endif
+  #ifdef STM32F10X_MD
+  String myID = Spark.deviceID();      
+  char charmyID[40];
+  strcpy(charmyID, myID.c_str());  
+  for(byte j = ADDRESS_START+1; j < ADDRESS_END; j++) {
+    this->_deviceID[j-1] = charmyID[j];
+    this->_deviceID[j] = '\0';
+  }
+  #ifdef DEBUG
+  Serial.print("Device ID: ");
+  Serial.println(this->_deviceID);
+  #endif     
+  #endif
+  return;
 }
 
 char* ARO_MicrOS::deviceID() {
 	return this->_deviceID;
 }
-#endif
+
+void ARO_MicrOS::eepromWrite(unsigned int address, byte value) {
+	#if defined(ARDUINO) && ARDUINO >= 100
+		EEPROM.write(address, value); 
+		return;
+	#endif
+}
+
+byte ARO_MicrOS::eepromRead(unsigned int address) {
+	byte value;
+	#if defined(ARDUINO) && ARDUINO >= 100
+		return EEPROM.read(address);
+	#endif
+}
 
 /**************************************************************************/
 /*!
@@ -1393,14 +1460,14 @@ bool ARO_MicrOS::displayConnectionDetails(Adafruit_CC3000& cc3000)
 
   if(!cc3000.getIPAddress(&ipAddress, &netmask, &gateway, &dhcpserv, &dnsserv))
   {
-  	#ifdef DEBUG_SERIAL
+  	#ifdef DEBUG
     Serial.println(F("Unable to retrieve the IP Address!\r\n"));
     #endif
     return false;
   }
   else
   {
-  	#ifdef DEBUG_SERIAL
+  	#ifdef DEBUG
     Serial.print(F("\nIP Addr: ")); 
     cc3000.printIPdotsRev(ipAddress);
     Serial.print(F("\nNetmask: ")); 
@@ -1419,9 +1486,12 @@ bool ARO_MicrOS::displayConnectionDetails(Adafruit_CC3000& cc3000)
 #endif
 
 #ifdef COMMAND_CONFIGUREISE_ENABLED
-bool ARO_MicrOS::configureISE(byte pin, int value1, int value2) {
-	if((ISE_CONF_START + (pin * ISE_CONF_BYTES)) > ISE_CONF_END) {
-		//out of address space
+bool ARO_MicrOS::configureISE(byte configuration_number, byte pin, char *value1, char *value2) {
+	unsigned int address_start = CONFIGURATION_START + (CONFIGURATION_LENGTH * configuration_number);
+	unsigned int address_pointer = address_start;
+	
+	if((address_start + CONFIGURATION_LENGTH) > CONFIGURATION_END) {
+		this->outputln("Out of address space");
 		return false;
 	}
 
@@ -1429,119 +1499,148 @@ bool ARO_MicrOS::configureISE(byte pin, int value1, int value2) {
 	unsigned long reading = 0;
 	int oldValue = 1;
 	int newValue = 0;	
-	int calibration_solution_first = (pin * ISE_CONF_BYTES) + ISE_CONF_START;
-	int calibration_solution_second = (pin * ISE_CONF_BYTES) + ISE_CONF_START + 1;		
-	int calibration_value_first = (pin * ISE_CONF_BYTES) + ISE_CONF_START + 2;
-	int calibration_value_second	= (pin * ISE_CONF_BYTES) + ISE_CONF_START + 4;
-	
-  EEPROM.write(calibration_solution_first, value1);
+
+	this->eepromWrite(address_pointer, 2);	
+	address_pointer++;
+	this->eepromWrite(address_pointer, pin);	
+	address_pointer++;	
+	while(*value1) {
+		this->eepromWrite(address_pointer, *value1++);	
+		address_pointer++;
+	}	
+	this->eepromWrite(address_pointer, 255);
+	address_pointer++;	
+	while(*value2) {
+		this->eepromWrite(address_pointer, *value2++);	
+		address_pointer++;
+	}	
+	this->eepromWrite(address_pointer, 255);
+	address_pointer++;		
 
 	matchCount = 0;
-  reading = 0;
-  while(matchCount < ISE_CONFIGURE_MATCHCOUNT) {
-    oldValue = newValue;
-    reading = 0;
-    #ifdef DEBUG_SERIAL
-    Serial.println("Not stable, carrying on");
-    #endif
-    for(byte i=0; i<255; i++) {
-      reading = reading + analogRead(pin);
-			#ifdef DEBUG_SERIAL
-			Serial.print("Reading: ");
-			Serial.println(reading);      
-			#endif
-      delay(10);
-    }
-    newValue = reading/255;
-    
-    if(newValue == oldValue) {
-      matchCount++;
-    }
-    #ifdef DEBUG_SERIAL
-    Serial.print("Old value: ");
-    Serial.println(oldValue);
-    Serial.print("New value: ");
-    Serial.println(newValue);    
-    Serial.print("Match Count: ");
-    Serial.println(matchCount);   
-    #endif
-    delay(500); 
-  }
-  matchCount = 0;
+	reading = 0;
+	while(matchCount < ISE_CONFIGURE_MATCHCOUNT) {
+		oldValue = newValue;
+		reading = 0;
+		#ifdef DEBUG
+		Serial.println("Not stable, carrying on");
+		#endif
+		for(byte i=0; i<255; i++) {
+			reading = reading + analogRead(pin);
+			delay(1);
+		}
+		newValue = reading/255;
 
-  EEPROM.write(calibration_value_first, this->lowValue(newValue));
-  EEPROM.write(calibration_value_first+1, this->highValue(newValue)); 
-
-  oldValue = 1;
-  newValue = 0; 
-
-	#ifdef cc3000_PubSubClient_h
-	if(mqttclient.connected()) {
-		memset(mqttString, 0, sizeof mqttString); 
-		strcat(mqttString, MQTT_Username);
-		strcat(mqttString, "/"); 
-		strcat(mqttString, "configureise");
-		mqttclient.publish(mqttString, "SECONDSTAGE");
+		if(newValue == oldValue) {
+			matchCount++;
+		}
+		#ifdef DEBUG
+		Serial.print("Old value: ");
+		Serial.println(oldValue);
+		Serial.print("New value: ");
+		Serial.println(newValue);    
+		Serial.print("Match Count: ");
+		Serial.println(matchCount);   
+		#endif
+		delay(500); 
 	}
-	#endif
-	#ifdef DEBUG_SERIAL
+	matchCount = 0;
+
+	this->eepromWrite(address_pointer, this->lowValue(newValue));
+	address_pointer++;		  
+	this->eepromWrite(address_pointer, this->highValue(newValue)); 
+	address_pointer++;
+	this->eepromWrite(address_pointer, 255); 
+
+	#ifdef DEBUG
 	Serial.println("Now configuring second solution");
 	#endif
 	
 	delay(16000);
 	
-  //second calibration solution
-	EEPROM.write(calibration_solution_second, value2);
-	
+	oldValue = 1;
+	newValue = 0;
+	while(matchCount < ISE_CONFIGURE_MATCHCOUNT) {
+		oldValue = newValue;
+		reading = 0;
+		#ifdef DEBUG
+		Serial.println("Not stable, carrying on");
+		#endif
+		for(byte i=0; i<255; i++) {
+			reading = reading + analogRead(pin);
+			delay(1);
+		}
+		newValue = reading/255;
+
+		if(newValue == oldValue) {
+			matchCount++;
+		}
+		#ifdef DEBUG
+		Serial.print("Old value: ");
+		Serial.println(oldValue);
+		Serial.print("New value: ");
+		Serial.println(newValue);    
+		Serial.print("Match Count: ");
+		Serial.println(matchCount);   
+		#endif
+		delay(500); 
+	}
 	matchCount = 0;
-  reading = 0;
-  while(matchCount < ISE_CONFIGURE_MATCHCOUNT) {
-    oldValue = newValue;
-    reading = 0;    
-    #ifdef DEBUG_SERIAL
-    Serial.println("Not stable, carrying on");
-    #endif
-    reading = 0;
-    for(byte i=0; i<255; i++) {
-      reading = reading + analogRead(pin);
-      delay(10);
-    }
-    newValue = reading/255;
-    
-    if(newValue == oldValue) {
-      matchCount++;
-    }
-		
-		#ifdef DEBUG_SERIAL
-    Serial.print("Old value: ");
-    Serial.println(oldValue);
-    Serial.print("New value: ");
-    Serial.println(newValue);		
-    Serial.print("Match Count: ");
-    Serial.println(matchCount);    
-    #endif
-    delay(500);
-  }
-  matchCount = 0;
-  EEPROM.write(calibration_value_second, this->lowValue(newValue));
-  EEPROM.write(calibration_value_second+1, this->highValue(newValue));
-  
-  return true;  
+
+	this->eepromWrite(address_pointer, this->lowValue(newValue));
+	address_pointer++;		  
+	this->eepromWrite(address_pointer, this->highValue(newValue)); 
+	address_pointer++;
+	this->eepromWrite(address_pointer, 255);
+
+	return true;  
 }
 #endif
 
 #ifdef COMMAND_READISE_ENABLED
-float ARO_MicrOS::readISE(byte pin) {
-  int y1 = EEPROM.read((pin * ISE_CONF_BYTES) + ISE_CONF_START);
-  int y2 = EEPROM.read((pin * ISE_CONF_BYTES) + ISE_CONF_START + 1);
-  int x1 = this->combineValue(EEPROM.read((pin * ISE_CONF_BYTES) + ISE_CONF_START + 2), EEPROM.read((pin * ISE_CONF_BYTES) + ISE_CONF_START + 3));  
-  int x2 = this->combineValue(EEPROM.read((pin * ISE_CONF_BYTES) + ISE_CONF_START + 4), EEPROM.read((pin * ISE_CONF_BYTES) + ISE_CONF_START + 5));
+float ARO_MicrOS::readISE(byte configuration_number) {
+	unsigned int address_start = CONFIGURATION_START + (CONFIGURATION_LENGTH * configuration_number);
+	unsigned int address_pointer = address_start + 1;
+	
+	float X1;
+	float X2;
+	unsigned int Y1;
+	unsigned int Y2;	
+	char buffer[10];
+	byte char_counter = 0;
+	byte pin;
+	
+	pin = this->eepromRead(address_pointer);
+	address_pointer++;
+	while(this->eepromRead(address_pointer) != 255) {
+		buffer[char_counter] = this->eepromRead(address_pointer);
+		char_counter++;
+		buffer[char_counter+1] = '\0';		
+		address_pointer++;
+	}
+	address_pointer++;
+	char_counter = 0;	
+	X1 = atof(buffer);
+	while(this->eepromRead(address_pointer) != 255) {
+		buffer[char_counter] = this->eepromRead(address_pointer);
+		char_counter++;
+		buffer[char_counter+1] = '\0';		
+		address_pointer++;		
+	}
+	address_pointer++;
+	char_counter = 0;	
+	X2 = atof(buffer);
+
+	Serial.println(pin);	
+	Serial.println(X1);
+	Serial.println(X2);	
+    
   //work out m for y = mx + b
-  float m = ((float)y1 - (float)y2) / ((float)x1 - (float)x2);
+  /*float m = ((float)y1 - (float)y2) / ((float)x1 - (float)x2);
   //work out b for y = mx + 
   float b = (float)y1 - ((float)m * (float)x1);
   
-  #ifdef DEBUG_SERIAL
+  #ifdef DEBUG
   Serial.print("X1: ");
   Serial.println(x1);
   Serial.print("X2: ");
@@ -1562,30 +1661,30 @@ float ARO_MicrOS::readISE(byte pin) {
     delay(10);
   }
   reading = reading/255;
-  #ifdef DEBUG_SERIAL
+  #ifdef DEBUG
   Serial.print("Analog: ");
   Serial.println(reading);
   #endif
   
   float y = (m*(float)reading) + b;
-  return y;
+  return y;*/
 }
 #endif
 
 #if defined(ADAFRUIT_CC3000_H)
 bool ARO_MicrOS::connectCC3000(Adafruit_CC3000& cc3000, Adafruit_CC3000_Client& client, const char* wlan_ssid, const char* wlan_pass, uint8_t wlan_security, bool reconnect) {
 	if(reconnect == true) {
-		#ifdef DEBUG_SERIAL
+		#ifdef DEBUG
 		Serial.println("Rebooting cc3000");
 		#endif
 		cc3000.reboot();
-		#ifdef DEBUG_SERIAL
+		#ifdef DEBUG
 		Serial.println("cc3000 Rebooted");
 		#endif		
 	}
 
   if (!cc3000.begin()) {
-    #ifdef DEBUG_SERIAL
+    #ifdef DEBUG
     Serial.println(F("Unable to initialise the CC3000! Check your wiring?"));
     #endif
     for(;;);
@@ -1593,42 +1692,42 @@ bool ARO_MicrOS::connectCC3000(Adafruit_CC3000& cc3000, Adafruit_CC3000_Client& 
 
   if ((this->cc3000CheckFirmwareVersion(cc3000) != 0x113) && (this->cc3000CheckFirmwareVersion(cc3000) != 0x118)) {
     //TODO have an error LED blink if wrong firmware
-    #ifdef DEBUG_SERIAL
+    #ifdef DEBUG
     Serial.println(F("Wrong firmware version!"));
     #endif
     for(;;);
   } else {
-    #ifdef DEBUG_SERIAL
+    #ifdef DEBUG
     Serial.print("Firmware V.");
     Serial.println(this->cc3000CheckFirmwareVersion(cc3000));
     #endif
   }
 
-  #ifdef DEBUG_SERIAL
+  #ifdef DEBUG
   Serial.println(F("\nDeleting old connection profiles"));
   #endif
   
   if (!cc3000.deleteProfiles()) {
-    #ifdef DEBUG_SERIAL
+    #ifdef DEBUG
     Serial.println(F("Failed to deleteProfiles()!"));
     #endif
     while(1);
   }
 
-  #ifdef DEBUG_SERIAL
+  #ifdef DEBUG
   Serial.print(F("\nAttempting to connect to ")); 
   Serial.println(wlan_ssid);
   #endif
 
   /* NOTE: Secure connections are not available in 'Tiny' mode! */
   if (!cc3000.connectToAP(wlan_ssid, wlan_pass, wlan_security)) {
-    #ifdef DEBUG_SERIAL
+    #ifdef DEBUG
     Serial.println(F("Failed to connect to SSID!"));
     #endif
     while(1);
   }
 
-  #ifdef DEBUG_SERIAL
+  #ifdef DEBUG
   Serial.println(F("Connected!"));
   /* Wait for DHCP to complete */
   Serial.println(F("Request DHCP"));
@@ -1650,8 +1749,8 @@ bool ARO_MicrOS::connectMQTT(Adafruit_CC3000& cc3000, Adafruit_CC3000_Client& cl
   // connect to the broker
   if (!client.connected()) {
     client = cc3000.connectTCP(server, 1883);
-    #ifdef DEBUG_SERIAL
-    Serial.println("Returned");
+    #ifdef DEBUG
+    Serial.println("cc3000.connectTCP Complete");
     #endif
   }
   
@@ -1669,7 +1768,7 @@ bool ARO_MicrOS::connectMQTT(Adafruit_CC3000& cc3000, Adafruit_CC3000_Client& cl
       strcat(mqttString, this->deviceID());      
       strcat(mqttString, "/");      
       strcat(mqttString, "control");
-      #ifdef DEBUG_SERIAL
+      #ifdef DEBUG
       Serial.println(mqttString);
       #endif
       mqttclient.subscribe(mqttString);
@@ -1681,53 +1780,62 @@ bool ARO_MicrOS::connectMQTT(Adafruit_CC3000& cc3000, Adafruit_CC3000_Client& cl
 }
 #endif
 
-/*
-void ARO_MicrOS::cc3000MQTTInterfaceCallback(char* topic, byte* payload, unsigned int length) {
-  char mqttReturnData[MQTT_MAX_PACKET_SIZE];
-
-  char commandString[length+1];
-  for(byte j = 0; j < length; j++) {
-    commandString[j] = payload[j];
-    commandString[j+1] = '\0';
-  }
-  this->control(mqttReturnData, commandString);
-  
-  memset(mqttString, 0, sizeof mqttString); 
-  strcat(mqttString, MQTT_Username);
-  strcat(mqttString, "/");
-  strcat(mqttString, this->deviceID()); 
-  strcat(mqttString, "/");  
-  strcat(mqttString, strtok(commandString, "/"));
-  mqttclient.publish(mqttString, mqttReturnData);
+#ifdef STM32F10X_MD
+bool ARO_MicrOS::sparkConnectMQTT(char* MQTT_Username, char* MQTT_Password) {
+    #ifdef DEBUG
+    Serial.println("mqttclient connecting");
+    #endif    
+	if (mqttclient.connect(this->deviceID(), MQTT_Username, MQTT_Password)) {
+	    #ifdef DEBUG
+	    Serial.println("mqttclient connected");
+	    #endif
+		memset(mqttString, 0, sizeof mqttString); 
+		strcat(mqttString, MQTT_Username);
+		strcat(mqttString, "/"); 
+		strcat(mqttString, "checkin");
+		mqttclient.publish(mqttString, this->deviceID());
+		memset(mqttString, 0, sizeof mqttString); 
+		strcat(mqttString, MQTT_Username);
+		strcat(mqttString, "/");
+		strcat(mqttString, this->deviceID());      
+		strcat(mqttString, "/");      
+		strcat(mqttString, "control");
+		#ifdef DEBUG
+		Serial.println(mqttString);
+		#endif
+		mqttclient.subscribe(mqttString);
+		return true;
+	}
+	return false; 
 }
-*/
+#endif
 
 void ARO_MicrOS::serialInterface() {
-  char serialCommandString[BUFFERSIZE];
-  char serialReturnData[BUFFERSIZE];
+	char serialCommandString[BUFFERSIZE];
+	char serialReturnData[BUFFERSIZE];
 	memset(serialReturnData, 0, sizeof serialReturnData);
 	memset(serialCommandString, 0, sizeof serialCommandString);	
-  byte inByte;
-  byte index = 0;
-  
-  while(Serial.available() > 0) {	
-    inByte = Serial.read();
-    serialCommandString[index] = inByte;
-    #ifdef DEBUG_SERIAL
-      Serial.print("Received: ");
-      Serial.println(serialCommandString[index]);
-    #endif
-    delay(1);
-    index++;
-    serialCommandString[index] = '\0';
-  }
+	byte inByte;
+	byte index = 0;
 
-  Serial.println(this->control(serialReturnData, serialCommandString));
+	while(Serial.available() > 0) {	
+		inByte = Serial.read();
+		serialCommandString[index] = inByte;
+		#ifdef DEBUG
+			Serial.print("Received: ");
+			Serial.println(serialCommandString[index]);
+		#endif
+		delay(1);
+		index++;
+		serialCommandString[index] = '\0';
+	}
 
-  return;
+	Serial.println(this->control(serialReturnData, serialCommandString));
+
+	return;
 }
 
-#if defined(cc3000_PubSubClient_h) && defined(ADAFRUIT_CC3000_H)
+#if defined(cc3000_PubSubClient_h) && defined(ADAFRUIT_CC3000_H) || defined(STM32F10X_MD)
 void ARO_MicrOS::publishCheckin() {	
   this->checkinCurrentMillis = millis();
   if ((this->checkinCurrentMillis - this->checkinPreviousMillis) >= 30000){
@@ -1742,3 +1850,326 @@ void ARO_MicrOS::publishCheckin() {
   }
 }
 #endif
+
+#if defined(cc3000_PubSubClient_h) || (defined(STM32F10X_MD) && defined(PubSubClient_h))
+void ARO_MicrOS::mqttPublish(char* topic, char* payload) {
+	#ifdef DEBUG
+	Serial.println(topic);
+	Serial.println(payload);
+	#endif
+	mqttclient.publish(topic, payload);
+}
+#endif
+
+void ARO_MicrOS::loop() {
+	// if we don't get a true back from mqttclient reconnect cc3000 and reconnect to mqtt server
+	#ifdef STM32F10X_MD
+	if(!mqttclient.loop()) {
+	    #ifdef DEBUG
+	    Serial.println("mqttclient not connected");
+	    #endif
+	    this->sparkConnectMQTT(MQTT_Username, MQTT_Password);
+	}
+	#endif
+	
+	#ifdef cc3000_PubSubClient_h
+	if (!mqttclient.loop()) {
+		#ifdef DEBUG
+		Serial.println("mqttclient.loop() failed");
+		#endif
+		if(!this->connectCC3000(cc3000, client, wlan_ssid, wlan_pass, wlan_security, true)) {
+			#ifdef DEBUG
+			Serial.println("connectCC3000");
+			#endif
+			while(1);
+		}
+		if(!this->connectMQTT(cc3000, client, mqttclient, MQTT_Username, MQTT_Password, server.ip)) {
+			#ifdef DEBUG
+			Serial.println("connectMQTT");
+			#endif
+			while(1);
+		}
+	}
+	#endif
+
+	#if defined(ARDUINO) && ARDUINO >= 100
+	if (Serial.available() > 0) {
+		this->serialInterface();
+	}
+	#endif
+
+	this->runMacros();
+
+	#if defined(cc3000_PubSubClient_h) || defined(STM32F10X_MD)
+	this->publishCheckin();
+	#endif
+}
+
+void ARO_MicrOS::configureEC(byte configuration_num, byte enable_pin, byte read_pin, char *char_calibration_units, char *char_calibration_scale, char *char_calibration_solution_1, char *char_calibration_solution_2) {
+	if((CONFIGURATION_START + (CONFIGURATION_LENGTH * configuration_num)) > CONFIGURATION_END) {
+		this->output("Configuration number out of bounds!");
+		return;
+	}
+
+	unsigned int address_start = CONFIGURATION_START + (CONFIGURATION_LENGTH * configuration_num);
+	unsigned int address_pointer = 0;
+	float calibration_solution_1 = atof(char_calibration_solution_1);
+	float calibration_solution_2 = atof(char_calibration_solution_2);	
+	
+	address_pointer = address_start;
+	this->eepromWrite(address_pointer, 1);
+	address_pointer++;	
+	this->eepromWrite(address_pointer, enable_pin);
+	address_pointer++;	
+	this->eepromWrite(address_pointer, read_pin);	
+	address_pointer++;	
+	while(*char_calibration_units) {
+		this->eepromWrite(address_pointer, *char_calibration_units++);	
+		address_pointer++;
+	}	
+	this->eepromWrite(address_pointer, 255);	
+	address_pointer++;	
+	while(*char_calibration_scale) {
+		this->eepromWrite(address_pointer, *char_calibration_scale++);	
+		address_pointer++;
+	}	
+	this->eepromWrite(address_pointer, 255);	
+	address_pointer++;		
+	while(*char_calibration_solution_1) {
+		this->eepromWrite(address_pointer, *char_calibration_solution_1++);	
+		address_pointer++;
+	}	
+	this->eepromWrite(address_pointer, 255);	
+	address_pointer++;		
+	while(*char_calibration_solution_2) {
+		this->eepromWrite(address_pointer, *char_calibration_solution_2++);	
+		address_pointer++;
+	}	
+	this->eepromWrite(address_pointer, 255);	
+	address_pointer++;
+
+	pinMode(enable_pin, OUTPUT);
+	unsigned long oldValue = 0;
+	unsigned int matchCount = 0;
+	
+	unsigned long freqhigh = 0;
+	unsigned long freqlow = 0;
+	unsigned long frequency = 0;
+	
+	while(matchCount < EC_MATCH_COUNT) {
+		oldValue = frequency;
+		frequency = 0;
+		this->outputln("Not stable, carrying on");
+		freqhigh = 0;
+		freqlow = 0;
+		digitalWrite(enable_pin, HIGH);
+		for(unsigned int i=0; i<EC_SAMPLES; i++) {
+			freqhigh+= pulseIn(read_pin, HIGH, 250000);
+			freqlow+= pulseIn(read_pin, LOW, 250000);			
+		}
+		digitalWrite(enable_pin, LOW);
+		frequency = 1000000 / ( (freqhigh / EC_SAMPLES) + (freqlow / EC_SAMPLES) );
+
+		if(oldValue > (frequency - 10) && oldValue < (frequency + 10)) {
+			matchCount++;
+		}
+
+		#ifdef DEBUG
+		this->output("Frequency: ");
+		this->outputln(frequency);
+		this->output("Old value: ");
+		this->outputln(oldValue);
+		this->output("Match Count: ");
+		this->outputln(matchCount);   
+		#endif
+	}
+	this->eepromWrite(address_pointer, this->lowValue(frequency));	
+	address_pointer++;			
+	this->eepromWrite(address_pointer, this->highValue(frequency));	
+	address_pointer++;			
+	this->eepromWrite(address_pointer, 255);	
+	address_pointer++;
+
+	this->outputln("Waiting 30 seconds. Please place probe in second solution");	
+	delay(30000);
+	
+	matchCount = 0;
+	while(matchCount < EC_MATCH_COUNT) {
+		oldValue = frequency;
+		frequency = 0;
+		this->outputln("Not stable, carrying on");
+		freqhigh = 0;
+		freqlow = 0;
+		digitalWrite(enable_pin, HIGH);
+		for(unsigned int i=0; i<EC_SAMPLES; i++) {
+			freqhigh+= pulseIn(read_pin, HIGH, 250000);
+			freqlow+= pulseIn(read_pin, LOW, 250000);			
+		}
+		digitalWrite(enable_pin, LOW);
+		frequency = 1000000 / ( (freqhigh / EC_SAMPLES) + (freqlow / EC_SAMPLES) );
+
+		if(oldValue > (frequency - 10) && oldValue < (frequency + 10)) {
+			matchCount++;
+		}
+
+		#ifdef DEBUG
+		this->output("Frequency: ");
+		this->outputln(frequency);
+		this->output("Old value: ");
+		this->outputln(oldValue);
+		this->output("Match Count: ");
+		this->outputln(matchCount);   
+		#endif
+	}
+	this->eepromWrite(address_pointer, this->lowValue(frequency));	
+	address_pointer++;			
+	this->eepromWrite(address_pointer, this->highValue(frequency));	
+	address_pointer++;			
+	this->eepromWrite(address_pointer, 255);	
+	address_pointer++;
+}
+
+float ARO_MicrOS::readEC(byte configuration_num) {
+	unsigned int address_start = CONFIGURATION_START + (CONFIGURATION_LENGTH * configuration_num);
+	unsigned int address_pointer = 0;
+	char calibration_units[10];
+	char calibration_scale[10];
+	char buffer[10];
+	byte char_counter = 0;
+	float X1;
+	float X2;	
+	unsigned long Y1;
+	unsigned long Y2;
+	unsigned long frequencyHigh = 0;
+	unsigned long frequencyLow = 0;	
+	unsigned long frequency = 0;
+		
+	address_pointer = address_start + 1;
+	byte enable_pin = this->eepromRead(address_pointer);
+	address_pointer++;
+	byte read_pin = this->eepromRead(address_pointer); 
+	address_pointer++;
+	while(this->eepromRead(address_pointer) != 255) {
+		calibration_units[char_counter] = this->eepromRead(address_pointer);
+		char_counter++;
+		calibration_units[char_counter+1] = '\0';		
+		address_pointer++;		
+	}
+	address_pointer++;
+	char_counter = 0;
+	while(this->eepromRead(address_pointer) != 255) {
+		calibration_scale[char_counter] = this->eepromRead(address_pointer);
+		char_counter++;
+		calibration_scale[char_counter+1] = '\0';		
+		address_pointer++;		
+	}
+	address_pointer++;
+	char_counter = 0;
+	while(this->eepromRead(address_pointer) != 255) {
+		buffer[char_counter] = this->eepromRead(address_pointer);
+		char_counter++;
+		buffer[char_counter+1] = '\0';		
+		address_pointer++;		
+	}
+	address_pointer++;
+	char_counter = 0;
+	X1 = atof(buffer);
+	while(this->eepromRead(address_pointer) != 255) {
+		buffer[char_counter] = this->eepromRead(address_pointer);
+		char_counter++;
+		buffer[char_counter+1] = '\0';		
+		address_pointer++;		
+	}
+	address_pointer++;
+	char_counter = 0;
+	X2 = atof(buffer);	
+	Y1 = this->combineValue(this->eepromRead(address_pointer++), this->eepromRead(address_pointer++));
+	address_pointer++;	
+	Y2 = this->combineValue(this->eepromRead(address_pointer++), this->eepromRead(address_pointer++));
+	address_pointer++;		
+	
+	#ifdef DEBUG
+	this->outputln(enable_pin);	
+	this->outputln(read_pin);	
+	this->outputln(calibration_units);
+	this->outputln(calibration_scale);	
+	Serial.println(X1);
+	Serial.println(X2);	
+	Serial.println(Y1);
+	Serial.println(Y2);	
+	#endif	
+
+	pinMode(enable_pin, OUTPUT);
+	digitalWrite(enable_pin, HIGH);
+
+	for(unsigned int j=0; j<EC_SAMPLES; j++) {
+		frequencyHigh+= pulseIn(read_pin, HIGH, 250000);
+		frequencyLow+= pulseIn(read_pin, LOW, 250000);
+	}
+	digitalWrite(enable_pin, LOW);  
+ 
+	frequency = 1000000 / ( (frequencyHigh / EC_SAMPLES) + (frequencyLow / EC_SAMPLES) );
+ 
+	#ifdef DEBUG
+	this->output("frequencyHigh: ");
+	this->outputln(frequencyHigh);
+	this->output("frequencyLow: ");
+	this->outputln(frequencyLow);  
+	this->output("Frequency: ");
+	Serial.println(frequency);
+	#endif
+
+	// now we need to work out all the values for this formula
+	//y = mx + b
+ 
+	float m = ((float)Y2 - (float)Y1) / ((float)X2 - (float)X1);
+
+	#ifdef DEBUG
+	Serial.print("m= ");
+	Serial.println(m, 8);
+	#endif
+
+	float b = Y1 - (m * X1);
+
+	#ifdef DEBUG 
+	Serial.print("b= ");
+	Serial.println(b, 8);
+	#endif
+
+	float x = ((float)frequency - b) / m;
+
+	#ifdef DEBUG 
+	Serial.print("x: ");
+	Serial.println(x, 8);
+	#endif
+ 
+
+  //to temperature compensate this you'll need to get a temp reading and plug it in to this formula:
+  //EC25 = ECf / (1 + x(t - 25)) change 25 to 18 if you want to compensate to 18.
+  //see the top comments for more info
+
+ 
+  //lets say it's 21 degrees C
+  //float EC25 = x / (1 + (0.019 * (21 - 25)));
+  //Serial.print("EC25 = ");
+  //Serial.println(EC25, 8);
+ 
+
+  
+  return x;
+}
+
+void ARO_MicrOS::output(const char* string) {
+	Serial.print(string);
+}
+void ARO_MicrOS::outputln(const char* string) {
+	Serial.println(string);
+}
+
+void ARO_MicrOS::output(byte string) {
+	Serial.print(string);
+}
+
+void ARO_MicrOS::outputln(byte string) {
+	Serial.println(string);
+}
