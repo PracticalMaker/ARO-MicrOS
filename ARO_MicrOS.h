@@ -78,11 +78,11 @@ private:
 	unsigned long checkinPreviousMillis;		
 	char mqttString[160];
 	
-	bool configureISE(byte configuration_number, byte pin, char *value1, char *value2, char *chartype);
+	bool configureISE(byte pin, char *value1, char *value2, char *chartype);
+	float readISE(byte pin);
 	int highValue(unsigned int value);
 	int lowValue(unsigned int value);
 	int combineValue(unsigned int lb, unsigned int hb);
-	float readISE(byte pin);
 	void setDeviceAddress(void);
 	void eepromWrite(unsigned int address, byte value);
 	byte eepromRead(unsigned int address);	

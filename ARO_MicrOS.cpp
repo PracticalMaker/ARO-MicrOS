@@ -162,24 +162,8 @@ char *ARO_MicrOS::control(char *returnData, char *commandString) {
   reset all the macros
   */
   #ifdef COMMAND_RESETMACROS_ENABLED
-  if(command == "resetmacros") {
+  if(command == "resetconfig") {
     this->resetMacros();
-
-    counter = 0;
-
-    returnData[counter] = 'R';
-    counter++;
-    returnData[counter] = 'E';
-    counter++;
-    returnData[counter] = 'S';
-    counter++;
-    returnData[counter] = 'E';
-    counter++;
-    returnData[counter] = 'T';
-    counter++;
-    delay(1);    
-
-    return returnData;
   }
   #endif	
   
@@ -326,30 +310,28 @@ char *ARO_MicrOS::control(char *returnData, char *commandString) {
   
 	#ifdef COMMAND_CONFIGUREISE_ENABLED
 	if(command == "configureise"){
-		char *char_configuration_number = strtok(NULL, "/");
 		char *charpin = strtok(NULL, "/");
 		char *charvalue1 = strtok(NULL, "/");
 		char *charvalue2 = strtok(NULL, "/");
 		char *chartype = strtok(NULL, "/");		
 
-		byte configuration_number = atoi(char_configuration_number);
 		byte pin = atoi(charpin);
 
-		return (char*)this->configureISE(configuration_number, pin, charvalue1, charvalue2, chartype);		
+		return (char*)this->configureISE(pin, charvalue1, charvalue2, chartype);		
 	}  
 	#endif
   
 	#ifdef COMMAND_READISE_ENABLED  
 	if(command == "readise"){
-		char *charconfiguration_number = strtok(NULL, "/");
-		byte configuration_number = atoi(charconfiguration_number);	  
+		char *charpin_number = strtok(NULL, "/");
+		byte pin_number = atoi(charpin_number);	  
 
 		#ifdef DEBUG
-		Serial.print("readise: ");
+		//Serial.print("readise: ");
 		//Serial.println(this->readISE(configuration_number));
 		#endif
 
-		this->readISE(configuration_number);
+		this->readISE(pin_number);
 	}  	
 	#endif
 
@@ -849,9 +831,12 @@ int ARO_MicrOS::combineValue(unsigned int lb, unsigned int hb) {
 
 
 void ARO_MicrOS::resetMacros(){
-  for(int i = MACROS_START; i <= MACROS_END; i++){
+  for(int i = CONFIGURATION_START; i <= CONFIGURATION_END; i++){
 		this->eepromWrite(i, 0);
   }
+  #if OUTPUT == SERIAL
+  Serial.println("Macros reset");
+  #endif
 }
 
 void ARO_MicrOS::pinModeSet(byte pin, byte mode) {
@@ -1488,9 +1473,27 @@ bool ARO_MicrOS::displayConnectionDetails(Adafruit_CC3000& cc3000)
 #endif
 
 #ifdef COMMAND_CONFIGUREISE_ENABLED
-bool ARO_MicrOS::configureISE(byte configuration_number, byte pin, char *value1, char *value2, char *type) {
-	unsigned int address_start = CONFIGURATION_START + (CONFIGURATION_LENGTH * configuration_number);
-	unsigned int address_pointer = address_start;
+bool ARO_MicrOS::configureISE(byte pin, char *value1, char *value2, char *type) {
+	byte x = 0;
+	byte counter = 0;
+	unsigned int address_start;
+	unsigned int address_pointer;
+	
+	while(x == 0) {
+		if(this->eepromRead(CONFIGURATION_START + (counter * 40)) == 0) {
+			address_pointer = CONFIGURATION_START + (counter * 40);
+			address_pointer = address_pointer;
+			x = 1;
+			#ifdef DEBUG
+			Serial.println("Matched pin");
+			#endif			
+		} else {
+			counter++;
+			#ifdef DEBUG
+			Serial.println(CONFIGURATION_START + 1 + (counter * 40));
+			#endif
+		}
+	}
 	
 	if((address_start + CONFIGURATION_LENGTH) > CONFIGURATION_END) {
 		#if OUTPUT == SERIAL
@@ -1500,8 +1503,6 @@ bool ARO_MicrOS::configureISE(byte configuration_number, byte pin, char *value1,
 	}
 
 	#if OUTPUT == SERIAL
-	Serial.print("Configuration number: ");
-	Serial.println(configuration_number);
 	Serial.print("Pin: ");
 	Serial.println(pin);
 	Serial.print("Value 1: ");
@@ -1517,7 +1518,7 @@ bool ARO_MicrOS::configureISE(byte configuration_number, byte pin, char *value1,
 	int oldValue = 1;
 	int newValue = 0;	
 
-	this->eepromWrite(address_pointer, CONFIGURATION_TYPE_PH);	
+	this->eepromWrite(address_pointer, CONFIGURATION_TYPE_ISE);	
 	address_pointer++;
 	this->eepromWrite(address_pointer, pin);	
 	address_pointer++;	
@@ -1632,9 +1633,28 @@ bool ARO_MicrOS::configureISE(byte configuration_number, byte pin, char *value1,
 #endif
 
 #ifdef COMMAND_READISE_ENABLED
-float ARO_MicrOS::readISE(byte configuration_number) {
-	unsigned int address_start = CONFIGURATION_START + (CONFIGURATION_LENGTH * configuration_number);
-	unsigned int address_pointer = address_start + 1;
+float ARO_MicrOS::readISE(byte pin) {
+	byte x = 0;
+	byte counter = 0;
+	unsigned int address_pointer = CONFIGURATION_START;
+	
+	while(x == 0 && address_pointer <= CONFIGURATION_END) {
+		#ifdef DEBUG
+		Serial.print("Address pointer: ");
+		Serial.println(address_pointer);
+		#endif
+
+		if(this->eepromRead(address_pointer) == CONFIGURATION_TYPE_ISE && this->eepromRead(address_pointer+1) == pin) {
+			x = 1;
+			#ifdef DEBUG
+			Serial.println("Matched pin");
+			#endif			
+		} else {
+			counter++;
+			address_pointer = address_pointer + CONFIGURATION_LENGTH;
+		}
+	}
+
 	
 	float X1;
 	float X2;
@@ -1642,10 +1662,10 @@ float ARO_MicrOS::readISE(byte configuration_number) {
 	unsigned int Y2;	
 	char buffer[10];
 	byte char_counter = 0;
-	byte pin;
 	
-	pin = this->eepromRead(address_pointer);
-	address_pointer++;
+	// add 2 because first 2 bytes are type and pin
+	address_pointer += 2;
+	
 	while(this->eepromRead(address_pointer) != 255) {
 		buffer[char_counter] = this->eepromRead(address_pointer);
 		char_counter++;

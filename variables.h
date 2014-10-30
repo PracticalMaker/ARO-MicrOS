@@ -1,4 +1,4 @@
-//#define DEBUG
+#define DEBUG
 
 // Which commands do you want enabled?
 #define COMMAND_IDENTIFY_ENABLED
@@ -47,12 +47,8 @@ EEPROM LOCATIONS
 #define MQTT_PASSWORD_END 238
 
 #define CONFIGURATION_START 130
-#define CONFIGURATION_END 220
+#define CONFIGURATION_END 511
 #define CONFIGURATION_LENGTH 40
-
-#define MACROS_START 239
-#define MACROS_END 511
-#define MACRO_BYTE_LENGTH 20
 
 
 // REWRITE VARIABLES TO DEFINE
@@ -69,6 +65,13 @@ byte celsius = 0;
 
 #define ISE_CONFIGURE_MATCHCOUNT 25
 
+//if OUTPUT defined as SERIAL then it will Serial.print
 #define SERIAL 1
+//what type of eeprom are you using
+#define EEPROM_TYPE INTERNAL
+//if EEPROM_TYPE defined as INTERNAL then CONFIGURATION_END will be 511
+#define INTERNAL 1
+//#define 24LC 2
+
 #define CONFIGURATION_TYPE_EC 1
-#define CONFIGURATION_TYPE_PH 1
+#define CONFIGURATION_TYPE_ISE 2
