@@ -14,10 +14,8 @@ The configureise command is used to configure ion specific electrodes (ISE). You
 
 First, make sure you open the ARO_MicrOS_Serial example sketch.
 
-configureise/Configuration_Number/PIN/Value1/Value2/Type
+configureise/PIN/Value1/Value2/Type
 
-
-**Configuration_Number**: ARO_MicrOS stores configurations by number starting from 0. By default there is room for 2 configurations, but this can be changed. Please see ARO_MicrOS Configurations
 
 **PIN**: Which analog pin you want to configure
 
