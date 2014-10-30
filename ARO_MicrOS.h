@@ -97,6 +97,7 @@ public:
 	ARO_MicrOS();
 	void begin();
 	void loop();
+	
 	#ifdef ADAFRUIT_CC3000_H
 	uint16_t cc3000CheckFirmwareVersion(Adafruit_CC3000& cc3000);
 	bool displayConnectionDetails(Adafruit_CC3000& cc3000);

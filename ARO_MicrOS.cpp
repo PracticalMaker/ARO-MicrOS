@@ -14,8 +14,8 @@ void ARO_MicrOS::begin() {
 	#ifdef _RTCLIB_H_
 	rtc.begin();
 	if (! rtc.isrunning()) {
-		#if defined(DEBUG) && OUTPUT == SERIAL
-		Serial.println("RTC is NOT running!");
+		#ifdef DEBUG
+		this->outputln("RTC is NOT running!");
 		#endif
 		// following line sets the RTC to the date & time this sketch was compiled
 		rtc.adjust(DateTime(__DATE__, __TIME__));
@@ -36,44 +36,44 @@ void ARO_MicrOS::begin() {
 }
 
 char *ARO_MicrOS::control(char *returnData, char *commandString) {
-  /******* NOTES  
-   * for control functions with an eeprom.write a delay before returning is needed otherwise no data is returned
-   * returnData needs to be setup as follows
-   * int counter = 0;
-   * returnData[counter] = value;
-   * counter++
-   * the reason being it makes it easier to change
-   */
+	/******* NOTES  
+	* for control functions with an eeprom.write a delay before returning is needed otherwise no data is returned
+	* returnData needs to be setup as follows
+	* int counter = 0;
+	* returnData[counter] = value;
+	* counter++
+	* the reason being it makes it easier to change
+	*/
 
-  String command = String(strtok(commandString, "/"));
-  int counter;
-  boolean check = false;
-  char itoa_buffer[6];
+	String command = String(strtok(commandString, "/"));
+	int counter;
+	boolean check = false;
+	char itoa_buffer[6];
 
-  memset(returnData, 0, sizeof returnData);
-  memset(itoa_buffer, 0, sizeof itoa_buffer);  
+	memset(returnData, 0, sizeof returnData);
+	memset(itoa_buffer, 0, sizeof itoa_buffer);  
+
+	#ifdef DEBUG
+	this->output("Command Token: ");
+	this->outputln(command);
+	#endif
   
-  #if defined(DEBUG) && OUTPUT == SERIAL
-	Serial.print("Command Token: ");
-	Serial.println(command);
-  #endif
-  
-  /*
-  identify
-  */
-  #ifdef COMMAND_IDENTIFY_ENABLED
-  if(command == "identify") {    
-    counter = 0;
-     
-    for(byte j = ADDRESS_START+1; j < ADDRESS_END; j++) {
-	  returnData[counter] = this->eepromRead(j);
-      counter++;
-    }    
-    returnData[counter] = '\0';
-    delay(1);    
-    return returnData;    
-  }
-  #endif
+	/*
+	identify
+	*/
+	#ifdef COMMAND_IDENTIFY_ENABLED
+	if(command == "identify") {    
+		counter = 0;
+
+		for(byte j = ADDRESS_START+1; j < ADDRESS_END; j++) {
+			returnData[counter] = this->eepromRead(j);
+			counter++;
+		}    
+		returnData[counter] = '\0';
+		delay(1);    
+		return returnData;    
+	}
+	#endif
   
   /*
   Setting Arduino Pin modes
@@ -87,11 +87,11 @@ char *ARO_MicrOS::control(char *returnData, char *commandString) {
     
     this->pinModeSet(pin, mode);
     
-    #if defined(DEBUG) && OUTPUT == SERIAL
-		Serial.print("Pin Mode Pin: ");
-		Serial.println(pin);
-		Serial.print("Pin Mode: ");
-		Serial.println(mode);      
+    #ifdef DEBUG
+		this->output("Pin Mode Pin: ");
+		this->outputln(pin);
+		this->output("Pin Mode: ");
+		this->outputln(mode);      
     #endif
     
     counter = 0;
@@ -326,9 +326,9 @@ char *ARO_MicrOS::control(char *returnData, char *commandString) {
 		char *charpin_number = strtok(NULL, "/");
 		byte pin_number = atoi(charpin_number);	  
 
-		#if defined(DEBUG) && OUTPUT == SERIAL
-		//Serial.print("readise: ");
-		//Serial.println(this->readISE(configuration_number));
+		#ifdef DEBUG
+		//this->output("readise: ");
+		//this->outputln(this->readISE(configuration_number));
 		#endif
 
 		this->readISE(pin_number);
@@ -341,11 +341,11 @@ char *ARO_MicrOS::control(char *returnData, char *commandString) {
     int tlc_pin_num = atoi(strtok(NULL, "/"));
     int tlc_action = atoi(strtok(NULL, "/"));
     
-		#if defined(DEBUG) && OUTPUT == SERIAL
-		Serial.print("tlc_pin_num ");
-		Serial.println(tlc_pin_num);
-		Serial.print("tlc_action ");
-		Serial.println(tlc_action);
+		#ifdef DEBUG
+		this->output("tlc_pin_num ");
+		this->outputln(tlc_pin_num);
+		this->output("tlc_action ");
+		this->outputln(tlc_action);
     #endif
    
     controlTLC5940(tlc_pin_num, tlc_action); 
@@ -835,7 +835,7 @@ void ARO_MicrOS::resetMacros(){
 		this->eepromWrite(i, 0);
   }
   #if OUTPUT == SERIAL
-  Serial.println("Macros reset");
+  this->outputln("Macros reset");
   #endif
 }
 
@@ -1071,23 +1071,23 @@ void runDS1307Macro(unsigned int mem_address){
         if(rtc_time < (time_start + this->eepromRead(mem_address + 9))) { //fade in
           if(this->eepromRead(mem_address + 7) <= 13) {
             int pwm_value = (rtc_time - time_start) * (this->eepromRead(mem_address + 8) / this->eepromRead(mem_address + 9));
-            #if defined(DEBUG) && OUTPUT == SERIAL
-						Serial.print("PWM Fade In: ");
-						Serial.println(pwm_value);
+            #ifdef DEBUG
+						this->output("PWM Fade In: ");
+						this->outputln(pwm_value);
             #endif
             analogWrite(this->eepromRead(mem_address + 7), pwm_value);
           }
         } else if(rtc_time > (time_stop - this->eepromRead(mem_address + 9))) { //fade out
           int pwm_value = (time_stop - rtc_time) * (this->eepromRead(mem_address + 8) / this->eepromRead(mem_address + 9));
-          #if defined(DEBUG) && OUTPUT == SERIAL
-					Serial.print("PWM Fade Out: ");        
-					Serial.println(pwm_value);
+          #ifdef DEBUG
+					this->output("PWM Fade Out: ");        
+					this->outputln(pwm_value);
           #endif        
           analogWrite(this->eepromRead(mem_address + 7), pwm_value);
         } else {
-          #if defined(DEBUG) && OUTPUT == SERIAL
-					Serial.print("PWM On at: ");
-					Serial.println(this->eepromRead(mem_address + 8));
+          #ifdef DEBUG
+					this->output("PWM On at: ");
+					this->outputln(this->eepromRead(mem_address + 8));
           #endif
           analogWrite(this->eepromRead(mem_address + 7), this->eepromRead(mem_address + 8));
         }
@@ -1119,12 +1119,12 @@ int ARO_MicrOS::discoverOneWireDevices() {
     
     for( i = 0; i < 8; i++) {
       this->eepromWrite((e + i), addr[i]);
-      #if defined(DEBUG) && OUTPUT == SERIAL
-      Serial.print(addr[i], HEX);
+      #ifdef DEBUG
+      this->output(addr[i], HEX);
       #endif
     }
-    #if defined(DEBUG) && OUTPUT == SERIAL
-    Serial.println();
+    #ifdef DEBUG
+    this->outputln();
     #endif
 
     if ( OneWire::crc8( addr, 7) != addr[7]) {
@@ -1153,15 +1153,15 @@ int ARO_MicrOS::getDS18B20Temp(int device_num) {
     addr[i] = this->eepromRead((ONEWIRE_ADDRESSES_START + (ONEWIRE_ADDRESSES_BYTES * device_num) + i)); 
   }
 
-	#if defined(DEBUG) && OUTPUT == SERIAL
+	#ifdef DEBUG
 	if ( OneWire::crc8( addr, 7) != addr[7]) {
-		Serial.print("CRC is not valid!\n");
+		this->output("CRC is not valid!\n");
 	}
 	#endif
 
   if ( addr[0] != 0x28) {
-		#if defined(DEBUG) && OUTPUT == SERIAL
-    Serial.print("Device is not a DS18S20 family device.\n");
+		#ifdef DEBUG
+    this->output("Device is not a DS18S20 family device.\n");
     #endif
   }
 
@@ -1349,11 +1349,11 @@ void ARO_MicrOS::runMacros() {
 
   if(!cc3000.getMacAddress(macAddress))
   {
-    Serial.println(F("Unable to retrieve MAC Address!\r\n"));
+    this->outputln(F("Unable to retrieve MAC Address!\r\n"));
   }
   else
   {
-    Serial.print(F("MAC Address : "));
+    this->output(F("MAC Address : "));
     cc3000.printHex((byte*)&macAddress, 6);
   }
 }*/
@@ -1371,8 +1371,8 @@ void ARO_MicrOS::setDeviceAddress() {
 	  this->_deviceID[j] = '\0';
     }
 	#if OUTPUT == SERIAL
-	Serial.print("Device ID: ");
-	Serial.println(this->_deviceID);
+	this->output("Device ID: ");
+	this->outputln(this->_deviceID);
 	#endif   
   }
   #endif
@@ -1385,9 +1385,9 @@ void ARO_MicrOS::setDeviceAddress() {
     this->_deviceID[j-1] = charmyID[j];
     this->_deviceID[j] = '\0';
   }
-  #if defined(DEBUG) && OUTPUT == SERIAL
-  Serial.print("Device ID: ");
-  Serial.println(this->_deviceID);
+  #ifdef DEBUG
+  this->output("Device ID: ");
+  this->outputln(this->_deviceID);
   #endif     
   #endif
   return;
@@ -1447,25 +1447,25 @@ bool ARO_MicrOS::displayConnectionDetails(Adafruit_CC3000& cc3000)
 
   if(!cc3000.getIPAddress(&ipAddress, &netmask, &gateway, &dhcpserv, &dnsserv))
   {
-  	#if defined(DEBUG) && OUTPUT == SERIAL
-    Serial.println(F("Unable to retrieve the IP Address!\r\n"));
+  	#ifdef DEBUG
+    this->outputln(F("Unable to retrieve the IP Address!\r\n"));
     #endif
     return false;
   }
   else
   {
-  	#if defined(DEBUG) && OUTPUT == SERIAL
-    Serial.print(F("\nIP Addr: ")); 
+  	#ifdef DEBUG
+    this->output(F("\nIP Addr: ")); 
     cc3000.printIPdotsRev(ipAddress);
-    Serial.print(F("\nNetmask: ")); 
+    this->output(F("\nNetmask: ")); 
     cc3000.printIPdotsRev(netmask);
-    Serial.print(F("\nGateway: ")); 
+    this->output(F("\nGateway: ")); 
     cc3000.printIPdotsRev(gateway);
-    Serial.print(F("\nDHCPsrv: ")); 
+    this->output(F("\nDHCPsrv: ")); 
     cc3000.printIPdotsRev(dhcpserv);
-    Serial.print(F("\nDNSserv: ")); 
+    this->output(F("\nDNSserv: ")); 
     cc3000.printIPdotsRev(dnsserv);
-    Serial.println();
+    this->outputln();
     #endif
     return true;
   }
@@ -1484,33 +1484,33 @@ bool ARO_MicrOS::configureISE(byte pin, char *value1, char *value2, char *type) 
 			address_pointer = CONFIGURATION_START + (counter * 40);
 			address_pointer = address_pointer;
 			x = 1;
-			#if defined(DEBUG) && OUTPUT == SERIAL
-			Serial.println("Matched pin");
+			#ifdef DEBUG
+			this->outputln("Matched pin");
 			#endif			
 		} else {
 			counter++;
-			#if defined(DEBUG) && OUTPUT == SERIAL
-			Serial.println(CONFIGURATION_START + 1 + (counter * 40));
+			#ifdef DEBUG
+			this->outputln(CONFIGURATION_START + 1 + (counter * 40));
 			#endif
 		}
 	}
 	
 	if((address_start + CONFIGURATION_LENGTH) > CONFIGURATION_END) {
 		#if OUTPUT == SERIAL
-		Serial.println("Out of address space");
+		this->outputln("Out of address space");
 		#endif
 		return false;
 	}
 
 	#if OUTPUT == SERIAL
-	Serial.print("Pin: ");
-	Serial.println(pin);
-	Serial.print("Value 1: ");
-	Serial.println(value1);
-	Serial.print("Value 2: ");
-	Serial.println(value2);			
-	Serial.print("Type: ");
-	Serial.println(type);				
+	this->output("Pin: ");
+	this->outputln(pin);
+	this->output("Value 1: ");
+	this->outputln(value1);
+	this->output("Value 2: ");
+	this->outputln(value2);			
+	this->output("Type: ");
+	this->outputln(type);				
 	#endif
 
 	byte matchCount;
@@ -1542,8 +1542,8 @@ bool ARO_MicrOS::configureISE(byte pin, char *value1, char *value2, char *type) 
 	address_pointer++;		
 
 	#if OUTPUT == SERIAL
-	Serial.print("Configured match count: ");
-	Serial.println(ISE_CONFIGURE_MATCHCOUNT);
+	this->output("Configured match count: ");
+	this->outputln(ISE_CONFIGURE_MATCHCOUNT);
 	#endif
 
 	matchCount = 0;
@@ -1556,21 +1556,21 @@ bool ARO_MicrOS::configureISE(byte pin, char *value1, char *value2, char *type) 
 			delay(1);
 		}
 		#if OUTPUT == SERIAL
-		Serial.print("Match count: ");
-		Serial.println(matchCount);
+		this->output("Match count: ");
+		this->outputln(matchCount);
 		#endif		
 		newValue = reading/255;
 
 		if(newValue == oldValue) {
 			matchCount++;
 		}
-		#if defined(DEBUG) && OUTPUT == SERIAL
-		Serial.print("Old value: ");
-		Serial.println(oldValue);
-		Serial.print("New value: ");
-		Serial.println(newValue);    
-		Serial.print("Match Count: ");
-		Serial.println(matchCount);   
+		#ifdef DEBUG
+		this->output("Old value: ");
+		this->outputln(oldValue);
+		this->output("New value: ");
+		this->outputln(newValue);    
+		this->output("Match Count: ");
+		this->outputln(matchCount);   
 		#endif
 		delay(500); 
 	}
@@ -1583,7 +1583,7 @@ bool ARO_MicrOS::configureISE(byte pin, char *value1, char *value2, char *type) 
 	this->eepromWrite(address_pointer, 255); 
 
 	#if OUTPUT == SERIAL
-	Serial.println("Now configuring second solution. Please place probe in second solution. Waiting 30 seconds.");
+	this->outputln("Now configuring second solution. Please place probe in second solution. Waiting 30 seconds.");
 	#endif
 	
 	delay(30000);
@@ -1594,8 +1594,8 @@ bool ARO_MicrOS::configureISE(byte pin, char *value1, char *value2, char *type) 
 		oldValue = newValue;
 		reading = 0;
 		#if OUTPUT == SERIAL
-		Serial.print("Match count: ");
-		Serial.println(matchCount);
+		this->output("Match count: ");
+		this->outputln(matchCount);
 		#endif
 		for(byte i=0; i<255; i++) {
 			reading = reading + analogRead(pin);
@@ -1606,13 +1606,13 @@ bool ARO_MicrOS::configureISE(byte pin, char *value1, char *value2, char *type) 
 		if(newValue == oldValue) {
 			matchCount++;
 		}
-		#if defined(DEBUG) && OUTPUT == SERIAL
-		Serial.print("Old value: ");
-		Serial.println(oldValue);
-		Serial.print("New value: ");
-		Serial.println(newValue);    
-		Serial.print("Match Count: ");
-		Serial.println(matchCount);   
+		#ifdef DEBUG
+		this->output("Old value: ");
+		this->outputln(oldValue);
+		this->output("New value: ");
+		this->outputln(newValue);    
+		this->output("Match Count: ");
+		this->outputln(matchCount);   
 		#endif
 		delay(500); 
 	}
@@ -1625,7 +1625,7 @@ bool ARO_MicrOS::configureISE(byte pin, char *value1, char *value2, char *type) 
 	this->eepromWrite(address_pointer, 255);
 	
 	#if OUTPUT == SERIAL
-	Serial.println("Completed ISE configuration");
+	this->outputln("Completed ISE configuration");
 	#endif	
 
 	return true;  
@@ -1639,15 +1639,15 @@ float ARO_MicrOS::readISE(byte pin) {
 	unsigned int address_pointer = CONFIGURATION_START;
 
 	while(x == 0 && address_pointer <= CONFIGURATION_END) {
-		#if defined(DEBUG) && OUTPUT == SERIAL
-		Serial.print("Address pointer: ");
-		Serial.println(address_pointer);
+		#ifdef DEBUG
+		this->output("Address pointer: ");
+		this->outputln(address_pointer);
 		#endif
 
 		if(this->eepromRead(address_pointer) == CONFIGURATION_TYPE_ISE && this->eepromRead(address_pointer+1) == pin) {
 			x = 1;
-			#if defined(DEBUG) && OUTPUT == SERIAL
-			Serial.println("Matched pin");
+			#ifdef DEBUG
+			this->outputln("Matched pin");
 			#endif			
 		} else {
 			counter++;
@@ -1697,19 +1697,19 @@ float ARO_MicrOS::readISE(byte pin) {
 	address_pointer += 2;
 	Y2 = this->combineValue(this->eepromRead(address_pointer), this->eepromRead(address_pointer + 1));
 
-	#if defined(DEBUG) && OUTPUT == SERIAL
-	Serial.print("Pin: ");
-	Serial.println(pin);	
-	Serial.print("type: ");
-	Serial.println(type);
-	Serial.print("X1: ");	
-	Serial.println(X1);
-	Serial.print("X2: ");	
-	Serial.println(X2);	
-	Serial.print("Y1: ");	
-	Serial.println(Y1);
-	Serial.print("Y2: ");	
-	Serial.println(Y2);		
+	#ifdef DEBUG
+	this->output("Pin: ");
+	this->outputln(pin);	
+	this->output("type: ");
+	this->outputln(type);
+	this->output("X1: ");	
+	this->outputln(X1);
+	this->output("X2: ");	
+	this->outputln(X2);	
+	this->output("Y1: ");	
+	this->outputln(Y1);
+	this->output("Y2: ");	
+	this->outputln(Y2);		
 	#endif
 
 	//work out m for y = mx + b
@@ -1717,19 +1717,19 @@ float ARO_MicrOS::readISE(byte pin) {
 	//work out b for y = mx + 
 	float b = (float)Y1 - ((float)m * (float)X1);
 
-	#if defined(DEBUG) && OUTPUT == SERIAL
-	Serial.print("X1: ");
-	Serial.println(X1);
-	Serial.print("X2: ");
-	Serial.println(X2);  
-	Serial.print("Y1: ");
-	Serial.println(Y1);  
-	Serial.print("Y2: ");
-	Serial.println(Y2);  
-	Serial.print("M: ");
-	Serial.println(m);
-	Serial.print("B: ");
-	Serial.println(b);
+	#ifdef DEBUG
+	this->output("X1: ");
+	this->outputln(X1);
+	this->output("X2: ");
+	this->outputln(X2);  
+	this->output("Y1: ");
+	this->outputln(Y1);  
+	this->output("Y2: ");
+	this->outputln(Y2);  
+	this->output("M: ");
+	this->outputln(m);
+	this->output("B: ");
+	this->outputln(b);
 	#endif
 
 	long reading = 0;
@@ -1738,17 +1738,17 @@ float ARO_MicrOS::readISE(byte pin) {
 	delay(10);
 	}
 	reading = reading/255;
-	#if defined(DEBUG) && OUTPUT == SERIAL
-	Serial.print("Analog: ");
-	Serial.println(reading);
+	#ifdef DEBUG
+	this->output("Analog: ");
+	this->outputln(reading);
 	#endif
 
 	float y = (m*(float)reading) + b;
 
 	#if OUTPUT == SERIAL
-	Serial.print(type);
-	Serial.print(" ");
-	Serial.print(y);
+	this->output(type);
+	this->output(" ");
+	this->output(y);
 	#endif
 	
 	return y;
@@ -1758,63 +1758,63 @@ float ARO_MicrOS::readISE(byte pin) {
 #if defined(ADAFRUIT_CC3000_H)
 bool ARO_MicrOS::connectCC3000(Adafruit_CC3000& cc3000, Adafruit_CC3000_Client& client, const char* wlan_ssid, const char* wlan_pass, uint8_t wlan_security, bool reconnect) {
 	if(reconnect == true) {
-		#if defined(DEBUG) && OUTPUT == SERIAL
-		Serial.println("Rebooting cc3000");
+		#ifdef DEBUG
+		this->outputln("Rebooting cc3000");
 		#endif
 		cc3000.reboot();
-		#if defined(DEBUG) && OUTPUT == SERIAL
-		Serial.println("cc3000 Rebooted");
+		#ifdef DEBUG
+		this->outputln("cc3000 Rebooted");
 		#endif		
 	}
 
   if (!cc3000.begin()) {
-    #if defined(DEBUG) && OUTPUT == SERIAL
-    Serial.println(F("Unable to initialise the CC3000! Check your wiring?"));
+    #ifdef DEBUG
+    this->outputln(F("Unable to initialise the CC3000! Check your wiring?"));
     #endif
     for(;;);
   }
 
   if ((this->cc3000CheckFirmwareVersion(cc3000) != 0x113) && (this->cc3000CheckFirmwareVersion(cc3000) != 0x118)) {
     //TODO have an error LED blink if wrong firmware
-    #if defined(DEBUG) && OUTPUT == SERIAL
-    Serial.println(F("Wrong firmware version!"));
+    #ifdef DEBUG
+    this->outputln(F("Wrong firmware version!"));
     #endif
     for(;;);
   } else {
-    #if defined(DEBUG) && OUTPUT == SERIAL
-    Serial.print("Firmware V.");
-    Serial.println(this->cc3000CheckFirmwareVersion(cc3000));
+    #ifdef DEBUG
+    this->output("Firmware V.");
+    this->outputln(this->cc3000CheckFirmwareVersion(cc3000));
     #endif
   }
 
-  #if defined(DEBUG) && OUTPUT == SERIAL
-  Serial.println(F("\nDeleting old connection profiles"));
+  #ifdef DEBUG
+  this->outputln(F("\nDeleting old connection profiles"));
   #endif
   
   if (!cc3000.deleteProfiles()) {
-    #if defined(DEBUG) && OUTPUT == SERIAL
-    Serial.println(F("Failed to deleteProfiles()!"));
+    #ifdef DEBUG
+    this->outputln(F("Failed to deleteProfiles()!"));
     #endif
     while(1);
   }
 
-  #if defined(DEBUG) && OUTPUT == SERIAL
-  Serial.print(F("\nAttempting to connect to ")); 
-  Serial.println(wlan_ssid);
+  #ifdef DEBUG
+  this->output(F("\nAttempting to connect to ")); 
+  this->outputln(wlan_ssid);
   #endif
 
   /* NOTE: Secure connections are not available in 'Tiny' mode! */
   if (!cc3000.connectToAP(wlan_ssid, wlan_pass, wlan_security)) {
-    #if defined(DEBUG) && OUTPUT == SERIAL
-    Serial.println(F("Failed to connect to SSID!"));
+    #ifdef DEBUG
+    this->outputln(F("Failed to connect to SSID!"));
     #endif
     while(1);
   }
 
-  #if defined(DEBUG) && OUTPUT == SERIAL
-  Serial.println(F("Connected!"));
+  #ifdef DEBUG
+  this->outputln(F("Connected!"));
   /* Wait for DHCP to complete */
-  Serial.println(F("Request DHCP"));
+  this->outputln(F("Request DHCP"));
   #endif
   
   while (!cc3000.checkDHCP()) {
@@ -1833,8 +1833,8 @@ bool ARO_MicrOS::connectMQTT(Adafruit_CC3000& cc3000, Adafruit_CC3000_Client& cl
   // connect to the broker
   if (!client.connected()) {
     client = cc3000.connectTCP(server, 1883);
-    #if defined(DEBUG) && OUTPUT == SERIAL
-    Serial.println("cc3000.connectTCP Complete");
+    #ifdef DEBUG
+    this->outputln("cc3000.connectTCP Complete");
     #endif
   }
   
@@ -1852,8 +1852,8 @@ bool ARO_MicrOS::connectMQTT(Adafruit_CC3000& cc3000, Adafruit_CC3000_Client& cl
       strcat(mqttString, this->deviceID());      
       strcat(mqttString, "/");      
       strcat(mqttString, "control");
-      #if defined(DEBUG) && OUTPUT == SERIAL
-      Serial.println(mqttString);
+      #ifdef DEBUG
+      this->outputln(mqttString);
       #endif
       mqttclient.subscribe(mqttString);
       return true;
@@ -1866,12 +1866,12 @@ bool ARO_MicrOS::connectMQTT(Adafruit_CC3000& cc3000, Adafruit_CC3000_Client& cl
 
 #ifdef STM32F10X_MD
 bool ARO_MicrOS::sparkConnectMQTT(char* MQTT_Username, char* MQTT_Password) {
-    #if defined(DEBUG) && OUTPUT == SERIAL
-    Serial.println("mqttclient connecting");
+    #ifdef DEBUG
+    this->outputln("mqttclient connecting");
     #endif    
 	if (mqttclient.connect(this->deviceID(), MQTT_Username, MQTT_Password)) {
-	    #if defined(DEBUG) && OUTPUT == SERIAL
-	    Serial.println("mqttclient connected");
+	    #ifdef DEBUG
+	    this->outputln("mqttclient connected");
 	    #endif
 		memset(mqttString, 0, sizeof mqttString); 
 		strcat(mqttString, MQTT_Username);
@@ -1884,8 +1884,8 @@ bool ARO_MicrOS::sparkConnectMQTT(char* MQTT_Username, char* MQTT_Password) {
 		strcat(mqttString, this->deviceID());      
 		strcat(mqttString, "/");      
 		strcat(mqttString, "control");
-		#if defined(DEBUG) && OUTPUT == SERIAL
-		Serial.println(mqttString);
+		#ifdef DEBUG
+		this->outputln(mqttString);
 		#endif
 		mqttclient.subscribe(mqttString);
 		return true;
@@ -1905,16 +1905,16 @@ void ARO_MicrOS::serialInterface() {
 	while(Serial.available() > 0) {	
 		inByte = Serial.read();
 		serialCommandString[index] = inByte;
-		#if defined(DEBUG) && OUTPUT == SERIAL
-			Serial.print("Received: ");
-			Serial.println(serialCommandString[index]);
+		#ifdef DEBUG
+		this->output("Received: ");
+		this->outputln(serialCommandString[index]);
 		#endif
 		delay(1);
 		index++;
 		serialCommandString[index] = '\0';
 	}
 
-	Serial.println(this->control(serialReturnData, serialCommandString));
+	this->outputln(this->control(serialReturnData, serialCommandString));
 
 	return;
 }
@@ -1937,9 +1937,9 @@ void ARO_MicrOS::publishCheckin() {
 
 #if defined(cc3000_PubSubClient_h) || (defined(STM32F10X_MD) && defined(PubSubClient_h))
 void ARO_MicrOS::mqttPublish(char* topic, char* payload) {
-	#if defined(DEBUG) && OUTPUT == SERIAL
-	Serial.println(topic);
-	Serial.println(payload);
+	#ifdef DEBUG
+	this->outputln(topic);
+	this->outputln(payload);
 	#endif
 	mqttclient.publish(topic, payload);
 }
@@ -1949,8 +1949,8 @@ void ARO_MicrOS::loop() {
 	// if we don't get a true back from mqttclient reconnect cc3000 and reconnect to mqtt server
 	#ifdef STM32F10X_MD
 	if(!mqttclient.loop()) {
-	    #if defined(DEBUG) && OUTPUT == SERIAL
-	    Serial.println("mqttclient not connected");
+	    #ifdef DEBUG
+	    this->outputln("mqttclient not connected");
 	    #endif
 	    this->sparkConnectMQTT(MQTT_Username, MQTT_Password);
 	}
@@ -1958,25 +1958,26 @@ void ARO_MicrOS::loop() {
 	
 	#ifdef cc3000_PubSubClient_h
 	if (!mqttclient.loop()) {
-		#if defined(DEBUG) && OUTPUT == SERIAL
-		Serial.println("mqttclient.loop() failed");
+		#ifdef DEBUG
+		this->outputln("mqttclient.loop() failed");
 		#endif
 		if(!this->connectCC3000(cc3000, client, wlan_ssid, wlan_pass, wlan_security, true)) {
-			#if defined(DEBUG) && OUTPUT == SERIAL
-			Serial.println("connectCC3000");
+			#ifdef DEBUG
+			this->outputln("connectCC3000");
 			#endif
 			while(1);
 		}
 		if(!this->connectMQTT(cc3000, client, mqttclient, MQTT_Username, MQTT_Password, server.ip)) {
-			#if defined(DEBUG) && OUTPUT == SERIAL
-			Serial.println("connectMQTT");
+			#ifdef DEBUG
+			this->outputln("connectMQTT");
 			#endif
 			while(1);
 		}
 	}
 	#endif
 
-	#if defined(ARDUINO) && ARDUINO >= 100
+	
+	#if defined(ARDUINO) && ARDUINO >= 100 && OUTPUT == SERIAL
 	if (Serial.available() > 0) {
 		this->serialInterface();
 	}
@@ -2058,7 +2059,7 @@ void ARO_MicrOS::configureEC(byte configuration_num, byte enable_pin, byte read_
 			matchCount++;
 		}
 
-		#if defined(DEBUG) && OUTPUT == SERIAL
+		#ifdef DEBUG
 		this->output("Frequency: ");
 		this->outputln(frequency);
 		this->output("Old value: ");
@@ -2096,7 +2097,7 @@ void ARO_MicrOS::configureEC(byte configuration_num, byte enable_pin, byte read_
 			matchCount++;
 		}
 
-		#if defined(DEBUG) && OUTPUT == SERIAL
+		#ifdef DEBUG
 		this->output("Frequency: ");
 		this->outputln(frequency);
 		this->output("Old value: ");
@@ -2172,15 +2173,15 @@ float ARO_MicrOS::readEC(byte configuration_num) {
 	Y2 = this->combineValue(this->eepromRead(address_pointer++), this->eepromRead(address_pointer++));
 	address_pointer++;		
 	
-	#if defined(DEBUG) && OUTPUT == SERIAL
+	#ifdef DEBUG
 	this->outputln(enable_pin);	
 	this->outputln(read_pin);	
 	this->outputln(calibration_units);
 	this->outputln(calibration_scale);	
-	Serial.println(X1);
-	Serial.println(X2);	
-	Serial.println(Y1);
-	Serial.println(Y2);	
+	this->outputln(X1);
+	this->outputln(X2);	
+	this->outputln(Y1);
+	this->outputln(Y2);	
 	#endif	
 
 	pinMode(enable_pin, OUTPUT);
@@ -2194,13 +2195,13 @@ float ARO_MicrOS::readEC(byte configuration_num) {
  
 	frequency = 1000000 / ( (frequencyHigh / EC_SAMPLES) + (frequencyLow / EC_SAMPLES) );
  
-	#if defined(DEBUG) && OUTPUT == SERIAL
+	#ifdef DEBUG
 	this->output("frequencyHigh: ");
 	this->outputln(frequencyHigh);
 	this->output("frequencyLow: ");
 	this->outputln(frequencyLow);  
 	this->output("Frequency: ");
-	Serial.println(frequency);
+	this->outputln(frequency);
 	#endif
 
 	// now we need to work out all the values for this formula
@@ -2208,23 +2209,23 @@ float ARO_MicrOS::readEC(byte configuration_num) {
  
 	float m = ((float)Y2 - (float)Y1) / ((float)X2 - (float)X1);
 
-	#if defined(DEBUG) && OUTPUT == SERIAL
-	Serial.print("m= ");
-	Serial.println(m, 8);
+	#ifdef DEBUG
+	this->output("m= ");
+	this->outputln(m, 8);
 	#endif
 
 	float b = Y1 - (m * X1);
 
-	#if defined(DEBUG) && OUTPUT == SERIAL 
-	Serial.print("b= ");
-	Serial.println(b, 8);
+	#ifdef DEBUG 
+	this->output("b= ");
+	this->outputln(b, 8);
 	#endif
 
 	float x = ((float)frequency - b) / m;
 
-	#if defined(DEBUG) && OUTPUT == SERIAL 
-	Serial.print("x: ");
-	Serial.println(x, 8);
+	#ifdef DEBUG 
+	this->output("x: ");
+	this->outputln(x, 8);
 	#endif
  
 
@@ -2235,8 +2236,8 @@ float ARO_MicrOS::readEC(byte configuration_num) {
  
   //lets say it's 21 degrees C
   //float EC25 = x / (1 + (0.019 * (21 - 25)));
-  //Serial.print("EC25 = ");
-  //Serial.println(EC25, 8);
+  //this->output("EC25 = ");
+  //this->outputln(EC25, 8);
  
 
   
@@ -2244,16 +2245,24 @@ float ARO_MicrOS::readEC(byte configuration_num) {
 }
 
 void ARO_MicrOS::output(const char* string) {
+	#if OUTPUT == SERIAL
 	Serial.print(string);
+	#endif
 }
 void ARO_MicrOS::outputln(const char* string) {
-	Serial.println(string);
+	#if OUTPUT == SERIAL
+	Serial.print(string);
+	#endif
 }
 
 void ARO_MicrOS::output(byte string) {
+	#if OUTPUT == SERIAL
 	Serial.print(string);
+	#endif
 }
 
 void ARO_MicrOS::outputln(byte string) {
-	Serial.println(string);
+	#if OUTPUT == SERIAL
+	Serial.print(string);
+	#endif
 }
