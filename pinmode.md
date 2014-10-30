@@ -8,7 +8,7 @@ group:
 
 ## Command pinmode 
 
-This command allows you to set the pinmode to either input or output. Note that pins 0 - 25 states (INPUT|OUTPUT) are automatically saved to EEPROM (in an Arduino) so you only need to set the mode once and on restart it will automatically reset the modes for you.
+This command allows you to set the pinmode to either input or output. Note that pins 0 - 25 states (INPUT or OUTPUT) are automatically saved to EEPROM (in an Arduino) so you only need to set the mode once and on restart it will automatically reset the modes for you.
 
 ### Usage
 
