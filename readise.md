@@ -1,8 +1,8 @@
 ---
 layout: page
-title: EC 
+title: Command readise 
 tagline: Getting started
-group: navigation
+group: 
 ---
 {% include JB/setup %}
 
