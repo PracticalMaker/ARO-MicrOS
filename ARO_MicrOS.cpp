@@ -10,6 +10,19 @@ void ARO_MicrOS::begin() {
     this->outputln("Begin");
     #endif
 	this->setDeviceAddress();
+
+	//set pinmodes from eeprom memory on start
+	#if defined(ARDUINO) && ARDUINO >= 100
+		for(byte j=DIGITAL_PIN_START; j<=DIGITAL_PIN_END; j++) {
+			#if OUTPUT == SERIAL
+			this->output("Setting pin ");
+			this->output(j-DIGITAL_PIN_START);
+			this->output(" to mode ");
+			this->outputln(this->eepromRead(j));							
+			#endif
+			pinMode(j-DIGITAL_PIN_START, this->eepromRead(j));
+		}
+	#endif
 	
 	#ifdef _RTCLIB_H_
 	rtc.begin();
@@ -75,43 +88,43 @@ char *ARO_MicrOS::control(char *returnData, char *commandString) {
 	}
 	#endif
   
-  /*
-  Setting Arduino Pin modes
-  */
-  #ifdef COMMAND_PINMODE_ENABLED
-  if(command == "pinmode") {
-    char *charpin = strtok(NULL, "/");
-    char *charmode = strtok(NULL, "/");
-    byte pin = atoi(charpin);
-    byte mode = atoi(charmode);
-    
-    this->pinModeSet(pin, mode);
-    
-    #ifdef DEBUG
+	/*
+	Setting Arduino Pin modes
+	*/
+	#ifdef COMMAND_PINMODE_ENABLED
+	if(command == "pinmode") {
+		char *charpin = strtok(NULL, "/");
+		char *charmode = strtok(NULL, "/");
+		byte pin = atoi(charpin);
+		byte mode = atoi(charmode);
+
+		this->pinModeSet(pin, mode);
+
+		#ifdef DEBUG
 		this->output("Pin Mode Pin: ");
 		this->outputln(pin);
 		this->output("Pin Mode: ");
 		this->outputln(mode);      
-    #endif
-    
-    counter = 0;
+		#endif
 
-    if(charpin[0] != 0) {
-      returnData[counter] = charpin[0];
-      counter++;
-    }
-    if(charpin[1] != 0) {
-      returnData[counter] = charpin[1];
-      counter++;
-    }    
-    returnData[counter] = '/';
-    counter++;
-    returnData[counter] = *charmode;
-    delay(1);    
+		counter = 0;
 
-    return returnData;    
-  }
-  #endif
+		if(charpin[0] != 0) {
+			returnData[counter] = charpin[0];
+			counter++;
+		}
+		if(charpin[1] != 0) {
+			returnData[counter] = charpin[1];
+			counter++;
+		}    
+		returnData[counter] = '/';
+		counter++;
+		returnData[counter] = *charmode;
+		delay(1);    
+
+		return returnData;    
+	}
+	#endif
   
   /*
   Set pin status
@@ -2251,7 +2264,7 @@ void ARO_MicrOS::output(const char* string) {
 }
 void ARO_MicrOS::outputln(const char* string) {
 	#if OUTPUT == SERIAL
-	Serial.print(string);
+	Serial.println(string);
 	#endif
 }
 
@@ -2263,6 +2276,6 @@ void ARO_MicrOS::output(byte string) {
 
 void ARO_MicrOS::outputln(byte string) {
 	#if OUTPUT == SERIAL
-	Serial.print(string);
+	Serial.println(string);
 	#endif
 }
