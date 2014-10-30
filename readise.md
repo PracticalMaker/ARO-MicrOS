@@ -6,4 +6,4 @@ group: navigation
 ---
 {% include JB/setup %}
 
-# Setting up EC/PPM/Salinity
+# Command readise 
