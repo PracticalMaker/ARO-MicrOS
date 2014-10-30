@@ -9,9 +9,6 @@ tagline:
 [Available on Github](https://github.com/PracticalMaker/ARO-MicrOS)
 
 ###  Commands
-1. [configureise](/configureise.html)
-  - This command is used for configuring Ion Specific Electrodes (ISE). You would use this command to configure pH, Nitrate, ORP etc. probes
-2. [readise](/readise.html)
-  - This command uses the configuration data from configureise and returns a value. Use this to read pH, Nitrate, ORP etc. probes
-3. [identify](/identify.html)
-  - This command will return a unique ID for the device. This isn't really used on the device currently, but is useful for external communication routing
+Commands are used to interact with ARO MicrOS without having to write code by yourself. Think of it as being able to configure device functions and write automation functions without having to write a single line of code by yourself!
+
+[Go here for the command list](/commands.html)
