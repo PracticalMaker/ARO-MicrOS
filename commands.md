@@ -14,3 +14,7 @@ tagline:
   - This command will return a unique ID for the device. This isn't really used on the device currently, but is useful for external communication routing
 4. [pinmode](/pinmode.html)
   - This command allows you to set pins as inputs and outputs. Pins 0 - 25 state are automatically saved to EEPROM so on a restart it's saved.
+5. [setpin](/setpin.html)
+  - This command allows you to change the status of pins: either ON, OFF or a PWM output.
+6. resetconfig
+  - Running this command will erase ALL configurations you have saved. Use with caution because this is tantamount to formatting your hard drive.
