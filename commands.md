@@ -2,6 +2,7 @@
 layout: page
 title: Commands 
 tagline: 
+group: navigation
 ---
 {% include JB/setup %}
 
