@@ -126,109 +126,109 @@ char *ARO_MicrOS::control(char *returnData, char *commandString) {
 	}
 	#endif
   
-  /*
-  Set pin status
-  */
-  #ifdef COMMAND_SETPIN_ENABLED
-  if(command == "setpin") {
-    char *charpin = strtok(NULL, "/");
-    char *charpinstatus = strtok(NULL, "/");
-    byte pin = atoi(charpin);
-    byte pinstatus = atoi(charpinstatus);
+	/*
+	Set pin status
+	*/
+	#ifdef COMMAND_SETPIN_ENABLED
+	if(command == "setpin") {
+		char *charpin = strtok(NULL, "/");
+		char *charpinstatus = strtok(NULL, "/");
+		byte pin = atoi(charpin);
+		byte pinstatus = atoi(charpinstatus);
 
-    setPinStatus(pin, pinstatus);
+		this->setPinStatus(pin, pinstatus);
 
-    counter = 0;
-    check = false;	
+		counter = 0;
+		check = false;	
 
-    if(charpin[0] != 0) {
-      returnData[counter] = charpin[0];
-      counter++;
-    }
-    if(charpin[1] != 0) {
-      returnData[counter] = charpin[1];
-      counter++;
-    }    
-    returnData[counter] = '/';
-    counter++;    
-    if(charpinstatus[0] != 0) {
-      returnData[counter] = charpinstatus[0];
-      counter++;
-    }
-    if(charpinstatus[1] != 0) {
-      returnData[counter] = charpinstatus[1];
-      counter++;
-    } else {
-      check = true;
-    }
-    if(charpinstatus[2] != 0 && check != true) {
-      returnData[counter] = charpinstatus[2];
-      counter++;
-    }
-    delay(1);
+		if(charpin[0] != 0) {
+			returnData[counter] = charpin[0];
+			counter++;
+		}
+		if(charpin[1] != 0) {
+			returnData[counter] = charpin[1];
+			counter++;
+		}    
+		returnData[counter] = '/';
+		counter++;    
+		if(charpinstatus[0] != 0) {
+			returnData[counter] = charpinstatus[0];
+			counter++;
+		}
+		if(charpinstatus[1] != 0) {
+			returnData[counter] = charpinstatus[1];
+			counter++;
+		} else {
+			check = true;
+		}
+		if(charpinstatus[2] != 0 && check != true) {
+			returnData[counter] = charpinstatus[2];
+			counter++;
+		}
+		delay(1);
 
-    return returnData;
-  }
-  #endif  
+		return returnData;
+	}
+	#endif  
   
-  /*
-  reset all the macros
-  */
-  #ifdef COMMAND_RESETMACROS_ENABLED
-  if(command == "resetconfig") {
-    this->resetMacros();
-  }
-  #endif	
+	/*
+	reset all the macros
+	*/
+	#ifdef COMMAND_RESETMACROS_ENABLED
+	if(command == "resetconfig") {
+		this->resetMacros();
+	}
+	#endif	
   
-  /* 
-  analogread
-  */
-  #ifdef COMMAND_ANALOGPINREAD_ENABLED
-  if(command == "analogpinread"){
-    char *charwatch_pin = strtok(NULL, "/");
-    int watch_pin = atoi(charwatch_pin);
+	/* 
+	analogread
+	*/
+	#ifdef COMMAND_ANALOGPINREAD_ENABLED
+	if(command == "analogpinread"){
+		char *charwatch_pin = strtok(NULL, "/");
+		int watch_pin = atoi(charwatch_pin);
 
-    itoa(analogRead(watch_pin), itoa_buffer, 10);
+		itoa(analogRead(watch_pin), itoa_buffer, 10);
 
-    int counter = 0;
-    boolean check = false;
+		counter = 0;
+		check = false;
 
-    returnData[counter] = *charwatch_pin;
-    counter++;
-    returnData[counter] = '/';
-    counter++;
-    if(itoa_buffer[0] != 0) {
-      returnData[counter] = itoa_buffer[0]; 
-      counter++;
-    } else {
-      returnData[counter] = 48;
-      counter++;
-      check = true;
-    }
-    if(itoa_buffer[1] != 0 && check != true) {
-      returnData[counter] = itoa_buffer[1]; 
-      counter++;
-    } else {
-      check = true;
-    }
-    if(itoa_buffer[2] != 0 && check != true) {
-      returnData[counter] = itoa_buffer[2]; 
-      counter++;
-    } else {
-      check = true;
-    }
-    if(itoa_buffer[3] != 0 && check != true) {
-      returnData[counter] = itoa_buffer[3]; 
-      counter++;
-    } 
-    else {
-      check = true;
-    }
-    delay(1);   
+		returnData[counter] = *charwatch_pin;
+		counter++;
+		returnData[counter] = '/';
+		counter++;
+		if(itoa_buffer[0] != 0) {
+			returnData[counter] = itoa_buffer[0]; 
+			counter++;
+		} else {
+			returnData[counter] = 48;
+			counter++;
+			check = true;
+		}
+		if(itoa_buffer[1] != 0 && check != true) {
+			returnData[counter] = itoa_buffer[1]; 
+			counter++;
+		} else {
+			check = true;
+		}
+		if(itoa_buffer[2] != 0 && check != true) {
+			returnData[counter] = itoa_buffer[2]; 
+			counter++;
+		} else {
+			check = true;
+		}
+		if(itoa_buffer[3] != 0 && check != true) {
+			returnData[counter] = itoa_buffer[3]; 
+			counter++;
+		} 
+		else {
+			check = true;
+		}
+		delay(1);   
 
-    return returnData;
-  }
-  #endif
+		return returnData;
+	}
+	#endif
   
   #ifdef COMMAND_DIGITALPINREAD_ENABLED
   //TODO - not returning an address and won't return correct pin for values over 9
